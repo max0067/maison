@@ -18,7 +18,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             case 'create':
                 // Vérifier la disponibilité
                 if (!verifierDisponibilite($_POST['chambre_id'], $_POST['date_arrivee'], $_POST['date_depart'])) {
-                    $error = 'Cette chambre n\'est pas disponible pour ces dates.';
+                    $_SESSION['error'] = 'Cette chambre n\'est pas disponible pour ces dates.';
+                    header('Location: ?action=new');
+                    exit;
                 } else {
                     $prix_total = calculerPrixTotal($_POST['chambre_id'], $_POST['date_arrivee'], $_POST['date_depart']);
 
@@ -45,10 +47,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $_POST['montant_paye'] ?? 0,
                         $_POST['mode_paiement'] ?? null
                     ])) {
-                        $message = 'Réservation créée avec succès !';
-                        $action = 'list';
+                        $_SESSION['message'] = 'Réservation créée avec succès !';
+                        header('Location: ?');
+                        exit;
                     } else {
-                        $error = 'Erreur lors de la création de la réservation.';
+                        $_SESSION['error'] = 'Erreur lors de la création de la réservation.';
+                        header('Location: ?action=new');
+                        exit;
                     }
                 }
                 break;
@@ -78,20 +83,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $_POST['notes_paiement'],
                     $_POST['id']
                 ])) {
-                    $message = 'Réservation modifiée avec succès !';
-                    $action = 'list';
+                    $_SESSION['message'] = 'Réservation modifiée avec succès !';
+                    header('Location: ?');
+                    exit;
                 } else {
-                    $error = 'Erreur lors de la modification.';
+                    $_SESSION['error'] = 'Erreur lors de la modification.';
+                    header('Location: ?action=edit&id=' . $_POST['id']);
+                    exit;
                 }
                 break;
 
             case 'update_status':
                 $stmt = $db->prepare("UPDATE reservations SET statut = ? WHERE id = ?");
                 if ($stmt->execute([$_POST['statut'], $_POST['id']])) {
-                    $message = 'Statut mis à jour avec succès !';
+                    $_SESSION['message'] = 'Statut mis à jour avec succès !';
                 } else {
-                    $error = 'Erreur lors de la mise à jour du statut.';
+                    $_SESSION['error'] = 'Erreur lors de la mise à jour du statut.';
                 }
+                header('Location: ?');
+                exit;
                 break;
 
             case 'update_paiement':
@@ -110,22 +120,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $_POST['notes_paiement'],
                     $_POST['id']
                 ])) {
-                    $message = 'Paiement mis à jour avec succès !';
+                    $_SESSION['message'] = 'Paiement mis à jour avec succès !';
+                    header('Location: ?action=paiement&id=' . $_POST['id']);
+                    exit;
                 } else {
-                    $error = 'Erreur lors de la mise à jour du paiement.';
+                    $_SESSION['error'] = 'Erreur lors de la mise à jour du paiement.';
+                    header('Location: ?action=paiement&id=' . $_POST['id']);
+                    exit;
                 }
                 break;
 
             case 'delete':
                 $stmt = $db->prepare("DELETE FROM reservations WHERE id = ?");
                 if ($stmt->execute([$_POST['id']])) {
-                    $message = 'Réservation supprimée avec succès !';
+                    $_SESSION['message'] = 'Réservation supprimée avec succès !';
                 } else {
-                    $error = 'Erreur lors de la suppression.';
+                    $_SESSION['error'] = 'Erreur lors de la suppression.';
                 }
+                header('Location: ?');
+                exit;
                 break;
         }
     }
+}
+
+// Récupérer les messages de la session
+if (isset($_SESSION['message'])) {
+    $message = $_SESSION['message'];
+    unset($_SESSION['message']);
+}
+if (isset($_SESSION['error'])) {
+    $error = $_SESSION['error'];
+    unset($_SESSION['error']);
 }
 
 // Récupérer les données selon l'action
