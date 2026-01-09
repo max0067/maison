@@ -67,4 +67,4 @@ INSERT INTO chambres (nom, description, prix, capacite, ordre) VALUES
 
 -- Création d'un admin par défaut (mot de passe: admin123)
 INSERT INTO admin_users (username, password, email) VALUES
-('admin', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'admin@maison-soleil.com');
+('admin', '$2y$12$SG1MvsiWG9PfNcwr0vKuieCneVHrCW9KsagV1bLe098Y12OaMDWAm', 'admin@maison-soleil.com');
