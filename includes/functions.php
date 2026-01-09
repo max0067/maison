@@ -122,16 +122,24 @@ function uploadImage($file, $directory = 'uploads/chambres/') {
         return false;
     }
 
-    $allowed_types = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
+    $allowed_types = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
     if (!in_array($file['type'], $allowed_types)) {
         return false;
     }
 
+    // Créer le dossier s'il n'existe pas
+    $fullPath = __DIR__ . '/../' . $directory;
+    if (!is_dir($fullPath)) {
+        mkdir($fullPath, 0755, true);
+    }
+
     $extension = pathinfo($file['name'], PATHINFO_EXTENSION);
     $filename = uniqid() . '.' . $extension;
-    $filepath = __DIR__ . '/../' . $directory . $filename;
+    $filepath = $fullPath . $filename;
 
     if (move_uploaded_file($file['tmp_name'], $filepath)) {
+        // Vérifier les permissions
+        chmod($filepath, 0644);
         return $filename;
     }
 
