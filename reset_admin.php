@@ -10,6 +10,20 @@ require_once 'config/database.php';
 try {
     $db = getDB();
 
+    // Vérifier si la table admin_users existe
+    $stmt = $db->query("SHOW TABLES LIKE 'admin_users'");
+    if ($stmt->rowCount() == 0) {
+        throw new Exception("La table 'admin_users' n'existe pas. Veuillez d'abord exécuter l'installation.");
+    }
+
+    // Vérifier la structure de la table
+    $stmt = $db->query("DESCRIBE admin_users");
+    $columns = $stmt->fetchAll(PDO::FETCH_COLUMN);
+
+    if (!in_array('password', $columns)) {
+        throw new Exception("La structure de la table 'admin_users' est incorrecte (colonne 'password' manquante). Veuillez réinstaller la base de données.");
+    }
+
     // Nouveau mot de passe : admin123
     $password = 'admin123';
     $hash = password_hash($password, PASSWORD_DEFAULT);
@@ -33,13 +47,21 @@ try {
         $message = "Utilisateur admin créé avec succès !";
     }
 
-} catch (PDOException $e) {
+} catch (Exception $e) {
     $success = false;
     $message = "Erreur : " . $e->getMessage();
 
-    // Vérifier si c'est une erreur de table inexistante
+    if (strpos($e->getMessage(), "n'existe pas") !== false || strpos($e->getMessage(), "doesn't exist") !== false) {
+        $message .= "<br><br><strong>Solution :</strong> Veuillez d'abord exécuter <a href='install.php' style='color: #2196F3;'>install.php</a> pour créer les tables.";
+    } elseif (strpos($e->getMessage(), "incorrecte") !== false) {
+        $message .= "<br><br><strong>Solution :</strong> Allez sur <a href='install.php' style='color: #2196F3;'>install.php</a> et choisissez la réinstallation complète.";
+    }
+} catch (PDOException $e) {
+    $success = false;
+    $message = "Erreur de base de données : " . $e->getMessage();
+
     if (strpos($e->getMessage(), "doesn't exist") !== false) {
-        $message .= "<br><br><strong>Les tables n'existent pas encore.</strong><br>Veuillez d'abord exécuter <a href='install.php'>install.php</a>";
+        $message .= "<br><br><strong>Solution :</strong> Veuillez d'abord exécuter <a href='install.php' style='color: #2196F3;'>install.php</a>";
     }
 }
 ?>

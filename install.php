@@ -9,13 +9,14 @@ require_once 'config/database.php';
 
 $errors = [];
 $success = [];
+$tablesExist = false;
 
 // Vérifier si les tables existent déjà
 try {
     $db = getDB();
     $stmt = $db->query("SHOW TABLES LIKE 'admin_users'");
     if ($stmt->rowCount() > 0) {
-        $errors[] = "Les tables existent déjà. Installation déjà effectuée.";
+        $tablesExist = true;
     }
 } catch (PDOException $e) {
     $errors[] = "Erreur de connexion à la base de données : " . $e->getMessage();
@@ -25,17 +26,47 @@ try {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($errors)) {
     try {
         $db = getDB();
+        $reinstall = isset($_POST['reinstall']) && $_POST['reinstall'] === 'yes';
+
+        // Si réinstallation, supprimer les tables existantes
+        if ($reinstall && $tablesExist) {
+            $db->exec("SET FOREIGN_KEY_CHECKS = 0");
+            $db->exec("DROP TABLE IF EXISTS reservations");
+            $db->exec("DROP TABLE IF EXISTS chambres");
+            $db->exec("DROP TABLE IF EXISTS contenus");
+            $db->exec("DROP TABLE IF EXISTS admin_users");
+            $db->exec("SET FOREIGN_KEY_CHECKS = 1");
+            $success[] = "Tables existantes supprimées.";
+        }
 
         // Lire le fichier SQL
         $sql = file_get_contents(__DIR__ . '/setup.sql');
 
-        // Diviser en requêtes individuelles
-        $queries = array_filter(array_map('trim', explode(';', $sql)));
+        // Diviser en requêtes individuelles (en ignorant les commentaires)
+        $lines = explode("\n", $sql);
+        $query = '';
 
-        // Exécuter chaque requête
-        foreach ($queries as $query) {
-            if (!empty($query)) {
-                $db->exec($query);
+        foreach ($lines as $line) {
+            $line = trim($line);
+
+            // Ignorer les commentaires et les lignes vides
+            if (empty($line) || substr($line, 0, 2) === '--') {
+                continue;
+            }
+
+            $query .= $line . "\n";
+
+            // Si la ligne se termine par un point-virgule, exécuter la requête
+            if (substr(trim($line), -1) === ';') {
+                try {
+                    $db->exec($query);
+                } catch (PDOException $e) {
+                    // Ignorer les erreurs de doublon si pas de réinstallation
+                    if (!$reinstall && strpos($e->getMessage(), 'Duplicate') === false) {
+                        throw $e;
+                    }
+                }
+                $query = '';
             }
         }
 
@@ -182,25 +213,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($errors)) {
             </div>
             <a href="admin/" class="link">Accéder au backoffice →</a>
         <?php else: ?>
-            <div class="info">
-                <p><strong>Ce script va installer :</strong></p>
-                <ul>
-                    <li>Les tables nécessaires à la base de données</li>
-                    <li>Un compte administrateur par défaut</li>
-                    <li>Des chambres d'exemple</li>
-                    <li>Les contenus par défaut du site</li>
-                </ul>
-                <p><strong>Configuration actuelle :</strong></p>
-                <ul>
-                    <li>Base de données : <?php echo DB_NAME; ?></li>
-                    <li>Serveur : <?php echo DB_HOST; ?></li>
-                </ul>
-            </div>
+            <?php if ($tablesExist): ?>
+                <div class="error">
+                    <p><strong>⚠️ Les tables existent déjà dans la base de données.</strong></p>
+                    <p>Vous avez deux options :</p>
+                </div>
+                <div class="info">
+                    <p><strong>Option 1 : Réinitialiser le mot de passe admin</strong></p>
+                    <p>Si vous voulez juste réinitialiser votre mot de passe, utilisez le script <a href="reset_admin.php" style="color: #2196F3;">reset_admin.php</a></p>
+                </div>
+                <div class="info">
+                    <p><strong>Option 2 : Réinstallation complète (ATTENTION : Toutes les données seront perdues !)</strong></p>
+                    <p>Cela va supprimer toutes les tables existantes et recommencer l'installation.</p>
+                    <form method="POST" onsubmit="return confirm('⚠️ ATTENTION : Cette action va supprimer TOUTES vos données (réservations, chambres, contenus, admin).\n\nÊtes-vous absolument sûr de vouloir continuer ?');">
+                        <input type="hidden" name="reinstall" value="yes">
+                        <button type="submit" class="btn" style="background: #dc3545;">Réinstaller (Supprimer toutes les données)</button>
+                    </form>
+                </div>
+                <a href="diagnostic.php" class="link">Voir le diagnostic de la base de données →</a>
+            <?php else: ?>
+                <div class="info">
+                    <p><strong>Ce script va installer :</strong></p>
+                    <ul>
+                        <li>Les tables nécessaires à la base de données</li>
+                        <li>Un compte administrateur par défaut</li>
+                        <li>Des chambres d'exemple</li>
+                        <li>Les contenus par défaut du site</li>
+                    </ul>
+                    <p><strong>Configuration actuelle :</strong></p>
+                    <ul>
+                        <li>Base de données : <?php echo DB_NAME; ?></li>
+                        <li>Serveur : <?php echo DB_HOST; ?></li>
+                    </ul>
+                </div>
 
-            <?php if (empty($errors)): ?>
-                <form method="POST">
-                    <button type="submit" class="btn">Installer maintenant</button>
-                </form>
+                <?php if (empty($errors)): ?>
+                    <form method="POST">
+                        <button type="submit" class="btn">Installer maintenant</button>
+                    </form>
+                <?php endif; ?>
             <?php endif; ?>
         <?php endif; ?>
     </div>
