@@ -1,0 +1,51 @@
+# Configuration Apache pour RSS Reader
+
+# Activer le rewrite engine
+RewriteEngine On
+
+# Rediriger vers HTTPS (à décommenter en production)
+# RewriteCond %{HTTPS} off
+# RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+# Protection des fichiers sensibles
+<FilesMatch "^(rss_setup\.sql|config/.*\.php|\.git.*)$">
+    Order Allow,Deny
+    Deny from all
+</FilesMatch>
+
+# Empêcher l'affichage des répertoires
+Options -Indexes
+
+# Configuration PHP recommandée
+php_flag display_errors Off
+php_flag log_errors On
+php_value error_log /var/log/php_errors.log
+
+# Limiter la taille des uploads
+php_value upload_max_filesize 10M
+php_value post_max_size 10M
+
+# Protection contre les injections
+php_flag magic_quotes_gpc Off
+php_flag magic_quotes_runtime Off
+
+# Cache et compression
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType text/css "access plus 1 month"
+    ExpiresByType application/javascript "access plus 1 month"
+    ExpiresByType image/jpeg "access plus 1 year"
+    ExpiresByType image/png "access plus 1 year"
+    ExpiresByType image/gif "access plus 1 year"
+</IfModule>
+
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css application/javascript
+</IfModule>
+
+# Encodage par défaut
+AddDefaultCharset UTF-8
+
+# Page d'erreur personnalisée (optionnel)
+# ErrorDocument 404 /404.php
+# ErrorDocument 500 /500.php
