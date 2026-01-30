@@ -459,6 +459,33 @@ class SIL_Admin {
                     <p><?php _e('Aucune suggestion disponible. Lancez une analyse pour générer des suggestions.', 'seo-internal-linking'); ?></p>
                 </div>
             <?php else : ?>
+                <!-- Filtres -->
+                <div class="sil-filters-bar">
+                    <label>
+                        <?php _e('Statut:', 'seo-internal-linking'); ?>
+                        <select id="sil-filter-status">
+                            <option value=""><?php _e('Tous', 'seo-internal-linking'); ?></option>
+                            <option value="pending"><?php _e('En attente', 'seo-internal-linking'); ?></option>
+                            <option value="applied"><?php _e('Appliqué', 'seo-internal-linking'); ?></option>
+                            <option value="rejected"><?php _e('Ignoré', 'seo-internal-linking'); ?></option>
+                        </select>
+                    </label>
+                    <label>
+                        <?php _e('Score:', 'seo-internal-linking'); ?>
+                        <select id="sil-filter-score">
+                            <option value=""><?php _e('Tous', 'seo-internal-linking'); ?></option>
+                            <option value="high"><?php _e('Élevé (≥70%)', 'seo-internal-linking'); ?></option>
+                            <option value="medium"><?php _e('Moyen (40-69%)', 'seo-internal-linking'); ?></option>
+                            <option value="low"><?php _e('Faible (<40%)', 'seo-internal-linking'); ?></option>
+                        </select>
+                    </label>
+                    <label>
+                        <?php _e('Recherche:', 'seo-internal-linking'); ?>
+                        <input type="text" id="sil-filter-search" placeholder="<?php _e('Article, ancre...', 'seo-internal-linking'); ?>">
+                    </label>
+                    <span id="sil-filtered-info" style="display: none;"></span>
+                </div>
+
                 <!-- Barre d'actions en masse -->
                 <div class="sil-bulk-actions">
                     <label>
@@ -511,8 +538,11 @@ class SIL_Admin {
                                         <?php echo esc_html($suggestion->target_title); ?>
                                     </a>
                                 </td>
-                                <td>
+                                <td class="sil-anchor-cell">
                                     <code><?php echo esc_html($suggestion->anchor_text); ?></code>
+                                    <?php if ($suggestion->status === 'pending') : ?>
+                                        <button type="button" class="button button-small sil-edit-anchor" title="<?php _e('Modifier', 'seo-internal-linking'); ?>">&#9998;</button>
+                                    <?php endif; ?>
                                 </td>
                                 <td>
                                     <span class="sil-score sil-score-<?php echo $this->get_score_class($suggestion->relevance_score); ?>">
@@ -553,6 +583,35 @@ class SIL_Admin {
                 </p>
 
                 <style>
+                .sil-filters-bar {
+                    background: #f9f9f9;
+                    padding: 12px 15px;
+                    margin-bottom: 10px;
+                    border: 1px solid #c3c4c7;
+                    border-radius: 4px;
+                    display: flex;
+                    align-items: center;
+                    gap: 20px;
+                    flex-wrap: wrap;
+                }
+                .sil-filters-bar label {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    font-weight: 500;
+                }
+                .sil-filters-bar select,
+                .sil-filters-bar input[type="text"] {
+                    padding: 5px 10px;
+                }
+                .sil-filters-bar input[type="text"] {
+                    width: 200px;
+                }
+                #sil-filtered-info {
+                    color: #666;
+                    font-style: italic;
+                    margin-left: auto;
+                }
                 .sil-bulk-actions {
                     background: #fff;
                     padding: 15px;
@@ -577,6 +636,28 @@ class SIL_Admin {
                 }
                 tr.sil-processing {
                     opacity: 0.5;
+                }
+                .sil-anchor-cell {
+                    position: relative;
+                }
+                .sil-anchor-cell .sil-edit-anchor {
+                    margin-left: 5px;
+                    padding: 2px 6px;
+                    font-size: 14px;
+                }
+                .sil-anchor-cell .sil-anchor-input {
+                    margin-bottom: 5px;
+                }
+                .sil-anchor-cell .sil-save-anchor,
+                .sil-anchor-cell .sil-cancel-anchor {
+                    margin-left: 3px;
+                    padding: 2px 6px;
+                }
+                tr.sil-row-success {
+                    background-color: #d4edda !important;
+                }
+                tr.sil-row-dismissed {
+                    background-color: #f8f9fa !important;
                 }
                 </style>
             <?php endif; ?>

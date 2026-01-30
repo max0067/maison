@@ -18,14 +18,16 @@
          * Bind events
          */
         bindEvents: function() {
+            var self = this;
+
             // Bulk analyze
-            $('#sil-bulk-analyze').on('click', this.bulkAnalyze.bind(this));
+            $(document).on('click', '#sil-bulk-analyze', this.bulkAnalyze.bind(this));
 
             // Scan existing links
-            $('#sil-scan-links').on('click', this.scanLinks.bind(this));
+            $(document).on('click', '#sil-scan-links', this.scanLinks.bind(this));
 
             // Analyze single post
-            $('.sil-analyze-post').on('click', this.analyzePost.bind(this));
+            $(document).on('click', '.sil-analyze-post', this.analyzePost.bind(this));
 
             // Insert link
             $(document).on('click', '.sil-insert-link', this.insertLink.bind(this));
@@ -34,24 +36,45 @@
             $(document).on('click', '.sil-dismiss-suggestion', this.dismissSuggestion.bind(this));
 
             // Export CSV
-            $('#sil-export-csv').on('click', this.exportCSV.bind(this));
+            $(document).on('click', '#sil-export-csv', this.exportCSV.bind(this));
 
-            // Selection multiple
-            $('#sil-select-all, #sil-select-all-header').on('change', this.toggleSelectAll.bind(this));
-            $(document).on('change', '.sil-select-item', this.updateSelectedCount.bind(this));
+            // Selection multiple - Tout sélectionner (utiliser délégation)
+            $(document).on('change', '#sil-select-all', function() {
+                self.toggleSelectAll($(this).prop('checked'));
+            });
+            $(document).on('change', '#sil-select-all-header', function() {
+                self.toggleSelectAll($(this).prop('checked'));
+            });
+
+            // Checkbox individuel
+            $(document).on('change', '.sil-select-item', function() {
+                self.updateSelectedCount();
+            });
 
             // Bulk actions
-            $('#sil-bulk-insert').on('click', this.bulkInsert.bind(this));
-            $('#sil-bulk-dismiss').on('click', this.bulkDismiss.bind(this));
+            $(document).on('click', '#sil-bulk-insert', this.bulkInsert.bind(this));
+            $(document).on('click', '#sil-bulk-dismiss', this.bulkDismiss.bind(this));
+
+            // Modifier l'ancre
+            $(document).on('click', '.sil-edit-anchor', this.editAnchor.bind(this));
+            $(document).on('click', '.sil-save-anchor', this.saveAnchor.bind(this));
+            $(document).on('click', '.sil-cancel-anchor', this.cancelAnchor.bind(this));
+
+            // Filtres
+            $(document).on('change', '#sil-filter-status, #sil-filter-score', this.applyFilters.bind(this));
+            $(document).on('input', '#sil-filter-search', this.applyFilters.bind(this));
         },
 
         /**
          * Toggle select all
          */
-        toggleSelectAll: function(e) {
-            var checked = $(e.currentTarget).prop('checked');
+        toggleSelectAll: function(checked) {
+            // Synchroniser les deux checkboxes
             $('#sil-select-all, #sil-select-all-header').prop('checked', checked);
-            $('.sil-select-item').prop('checked', checked);
+
+            // Sélectionner toutes les lignes visibles (respecter les filtres)
+            $('#sil-suggestions-table tbody tr:visible .sil-select-item').prop('checked', checked);
+
             this.updateSelectedCount();
         },
 
@@ -60,10 +83,17 @@
          */
         updateSelectedCount: function() {
             var count = $('.sil-select-item:checked').length;
+            var total = $('.sil-select-item').length;
+
             $('#sil-selected-num').text(count);
 
             // Enable/disable bulk action buttons
-            $('#sil-bulk-insert, #sil-bulk-dismiss').prop('disabled', count === 0);
+            var hasSelection = count > 0;
+            $('#sil-bulk-insert, #sil-bulk-dismiss').prop('disabled', !hasSelection);
+
+            // Mettre à jour l'état du "tout sélectionner"
+            var allChecked = count === total && total > 0;
+            $('#sil-select-all, #sil-select-all-header').prop('checked', allChecked);
         },
 
         /**
@@ -82,6 +112,122 @@
                 });
             });
             return items;
+        },
+
+        /**
+         * Edit anchor text
+         */
+        editAnchor: function(e) {
+            e.preventDefault();
+            var $btn = $(e.currentTarget);
+            var $row = $btn.closest('tr');
+            var $anchorCell = $row.find('.sil-anchor-cell');
+            var currentAnchor = $row.data('anchor');
+
+            $anchorCell.html(
+                '<input type="text" class="sil-anchor-input" value="' + currentAnchor + '" style="width: 100%;">' +
+                '<button type="button" class="button button-small sil-save-anchor" title="Enregistrer">&#10004;</button>' +
+                '<button type="button" class="button button-small sil-cancel-anchor" title="Annuler">&#10008;</button>'
+            );
+            $anchorCell.find('input').focus().select();
+        },
+
+        /**
+         * Save edited anchor
+         */
+        saveAnchor: function(e) {
+            e.preventDefault();
+            var $btn = $(e.currentTarget);
+            var $row = $btn.closest('tr');
+            var $anchorCell = $row.find('.sil-anchor-cell');
+            var newAnchor = $anchorCell.find('.sil-anchor-input').val().trim();
+
+            if (newAnchor) {
+                $row.data('anchor', newAnchor);
+                $row.find('.sil-insert-link').data('anchor', newAnchor);
+                $anchorCell.html(
+                    '<code>' + newAnchor + '</code> ' +
+                    '<button type="button" class="button button-small sil-edit-anchor" title="Modifier">&#9998;</button>'
+                );
+            }
+        },
+
+        /**
+         * Cancel anchor edit
+         */
+        cancelAnchor: function(e) {
+            e.preventDefault();
+            var $btn = $(e.currentTarget);
+            var $row = $btn.closest('tr');
+            var $anchorCell = $row.find('.sil-anchor-cell');
+            var originalAnchor = $row.data('anchor');
+
+            $anchorCell.html(
+                '<code>' + originalAnchor + '</code> ' +
+                '<button type="button" class="button button-small sil-edit-anchor" title="Modifier">&#9998;</button>'
+            );
+        },
+
+        /**
+         * Apply filters
+         */
+        applyFilters: function() {
+            var statusFilter = $('#sil-filter-status').val();
+            var scoreFilter = $('#sil-filter-score').val();
+            var searchFilter = $('#sil-filter-search').val().toLowerCase();
+
+            $('#sil-suggestions-table tbody tr').each(function() {
+                var $row = $(this);
+                var status = $row.data('status');
+                var score = parseFloat($row.find('.sil-score').text()) || 0;
+                var sourceText = $row.find('td:eq(1)').text().toLowerCase();
+                var targetText = $row.find('td:eq(2)').text().toLowerCase();
+                var anchorText = $row.data('anchor').toLowerCase();
+
+                var showStatus = !statusFilter || status === statusFilter;
+                var showScore = true;
+                var showSearch = true;
+
+                // Filtre par score
+                if (scoreFilter === 'high') {
+                    showScore = score >= 70;
+                } else if (scoreFilter === 'medium') {
+                    showScore = score >= 40 && score < 70;
+                } else if (scoreFilter === 'low') {
+                    showScore = score < 40;
+                }
+
+                // Filtre par recherche
+                if (searchFilter) {
+                    showSearch = sourceText.indexOf(searchFilter) !== -1 ||
+                                 targetText.indexOf(searchFilter) !== -1 ||
+                                 anchorText.indexOf(searchFilter) !== -1;
+                }
+
+                if (showStatus && showScore && showSearch) {
+                    $row.show();
+                } else {
+                    $row.hide();
+                    $row.find('.sil-select-item').prop('checked', false);
+                }
+            });
+
+            this.updateSelectedCount();
+            this.updateFilteredCount();
+        },
+
+        /**
+         * Update filtered count
+         */
+        updateFilteredCount: function() {
+            var visible = $('#sil-suggestions-table tbody tr:visible').length;
+            var total = $('#sil-suggestions-table tbody tr').length;
+
+            if (visible < total) {
+                $('#sil-filtered-info').text('(' + visible + ' / ' + total + ' affichés)').show();
+            } else {
+                $('#sil-filtered-info').hide();
+            }
         },
 
         /**
@@ -142,7 +288,7 @@
                             if (detail.result.success) {
                                 self.markRowAsApplied($row);
                             } else {
-                                $row.find('.sil-status').html('<span style="color: orange;">Échec</span>');
+                                $row.find('.sil-status').html('<span style="color: orange;" title="' + (detail.result.message || 'Erreur') + '">Échec</span>');
                             }
                         });
 
@@ -231,6 +377,7 @@
             $row.addClass('sil-row-success');
             $row.find('.sil-status').removeClass('sil-status-pending').addClass('sil-status-applied').text('Appliqué');
             $row.find('.sil-select-item').remove();
+            $row.find('.sil-insert-link, .sil-dismiss-suggestion, .sil-edit-anchor').remove();
             $row.find('td:last').html('<span class="dashicons dashicons-yes-alt" style="color: green;"></span>');
             $row.data('status', 'applied');
         },
@@ -242,7 +389,8 @@
             $row.addClass('sil-row-dismissed');
             $row.find('.sil-status').removeClass('sil-status-pending').addClass('sil-status-rejected').text('Ignoré');
             $row.find('.sil-select-item').remove();
-            $row.find('.sil-insert-link, .sil-dismiss-suggestion').remove();
+            $row.find('.sil-insert-link, .sil-dismiss-suggestion, .sil-edit-anchor').remove();
+            $row.find('td:last').html('<span class="dashicons dashicons-dismiss" style="color: #999;"></span>');
             $row.data('status', 'rejected');
         },
 
@@ -414,7 +562,7 @@
             var $row = $button.closest('tr');
             var sourceId = $button.data('source');
             var targetId = $button.data('target');
-            var anchor = $button.data('anchor');
+            var anchor = $row.data('anchor'); // Utiliser l'ancre de la row (peut avoir été modifiée)
             var suggestionId = $button.data('suggestion');
             var self = this;
 
