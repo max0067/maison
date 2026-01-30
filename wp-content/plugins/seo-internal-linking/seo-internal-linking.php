@@ -125,6 +125,7 @@ class SEO_Internal_Linking {
         add_action('wp_ajax_sil_get_suggestions', array($this, 'ajax_get_suggestions'));
         add_action('wp_ajax_sil_analyze_post', array($this, 'ajax_analyze_post'));
         add_action('wp_ajax_sil_insert_link', array($this, 'ajax_insert_link'));
+        add_action('wp_ajax_sil_bulk_insert_links', array($this, 'ajax_bulk_insert_links'));
         add_action('wp_ajax_sil_bulk_analyze', array($this, 'ajax_bulk_analyze'));
         add_action('wp_ajax_sil_run_diagnostic', array($this, 'ajax_run_diagnostic'));
         add_action('wp_ajax_sil_fix_tables', array($this, 'ajax_fix_tables'));
@@ -363,11 +364,53 @@ class SEO_Internal_Linking {
         $auto_linker = new SIL_Auto_Linker($this->options);
         $result = $auto_linker->insert_link_manually($source_id, $target_id, $anchor, $suggestion_id);
 
-        if ($result) {
-            wp_send_json_success(__('Lien inséré avec succès.', 'seo-internal-linking'));
+        if ($result['success']) {
+            wp_send_json_success($result['message']);
         } else {
-            wp_send_json_error(__('Erreur lors de l\'insertion du lien.', 'seo-internal-linking'));
+            wp_send_json_error($result['message']);
         }
+    }
+
+    /**
+     * AJAX: Insérer plusieurs liens en masse
+     */
+    public function ajax_bulk_insert_links() {
+        check_ajax_referer('sil_nonce', 'nonce');
+
+        if (!current_user_can('edit_posts')) {
+            wp_send_json_error(__('Permission refusée.', 'seo-internal-linking'));
+        }
+
+        $links = isset($_POST['links']) ? $_POST['links'] : array();
+
+        if (empty($links) || !is_array($links)) {
+            wp_send_json_error(__('Aucun lien à insérer.', 'seo-internal-linking'));
+        }
+
+        // Sanitize les données
+        $clean_links = array();
+        foreach ($links as $link) {
+            $clean_links[] = array(
+                'source_id' => intval($link['source_id']),
+                'target_id' => intval($link['target_id']),
+                'anchor' => sanitize_text_field($link['anchor']),
+                'suggestion_id' => isset($link['suggestion_id']) ? intval($link['suggestion_id']) : 0
+            );
+        }
+
+        $auto_linker = new SIL_Auto_Linker($this->options);
+        $results = $auto_linker->insert_links_bulk($clean_links);
+
+        wp_send_json_success(array(
+            'success_count' => $results['success'],
+            'failed_count' => $results['failed'],
+            'message' => sprintf(
+                __('%d lien(s) inséré(s) avec succès, %d échec(s).', 'seo-internal-linking'),
+                $results['success'],
+                $results['failed']
+            ),
+            'details' => $results['details']
+        ));
     }
 
     /**

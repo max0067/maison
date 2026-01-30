@@ -148,7 +148,7 @@ class SIL_Auto_Linker {
     }
 
     /**
-     * Insérer un lien dans le contenu
+     * Insérer un lien dans le contenu (pour l'auto-linking)
      */
     private function insert_link_in_content($content, $anchor, $target_post_id) {
         // Nettoyer l'ancre
@@ -158,35 +158,93 @@ class SIL_Auto_Linker {
             return $content;
         }
 
-        // Échapper les caractères spéciaux pour le regex
-        $escaped_anchor = preg_quote($anchor, '/');
+        // Créer le lien HTML
+        $link_html = $this->create_link_html($target_post_id, $anchor, 'sil-auto-link');
 
-        // Créer le pattern pour trouver le mot-clé
-        // Ne pas matcher à l'intérieur des balises HTML ou des liens existants
-        $pattern = '/(?<![<\w])(' . $escaped_anchor . ')(?![^<]*>)(?![^<]*<\/a>)/iu';
+        // Essayer de trouver et remplacer le texte
+        $new_content = $this->smart_replace($content, $anchor, $link_html);
 
-        // Vérifier si le pattern existe dans le contenu
-        if (!preg_match($pattern, $content)) {
-            return $content;
-        }
+        return $new_content;
+    }
 
-        // Créer le lien
-        $url = get_permalink($target_post_id);
-        $title = esc_attr(get_the_title($target_post_id));
+    /**
+     * Créer le HTML du lien
+     */
+    private function create_link_html($target_id, $anchor, $class = 'sil-link') {
+        $url = get_permalink($target_id);
+        $title = esc_attr(get_the_title($target_id));
 
         $link_attributes = 'href="' . esc_url($url) . '"';
         $link_attributes .= ' title="' . $title . '"';
+        $link_attributes .= ' class="' . esc_attr($class) . '"';
 
         if (isset($this->options['open_in_new_tab']) && $this->options['open_in_new_tab']) {
             $link_attributes .= ' target="_blank" rel="noopener"';
         }
 
-        $replacement = '<a ' . $link_attributes . ' class="sil-auto-link">$1</a>';
+        return '<a ' . $link_attributes . '>' . esc_html($anchor) . '</a>';
+    }
 
-        // Remplacer seulement la première occurrence
-        $new_content = preg_replace($pattern, $replacement, $content, 1);
+    /**
+     * Remplacement intelligent du texte
+     * Évite de remplacer dans les balises HTML, les liens existants, etc.
+     */
+    private function smart_replace($content, $search, $replacement, $limit = 1) {
+        // Normaliser les espaces
+        $search = trim($search);
 
-        return $new_content;
+        if (empty($search)) {
+            return $content;
+        }
+
+        // Sauvegarder les balises HTML pour les restaurer après
+        $placeholders = array();
+        $placeholder_index = 0;
+
+        // Protéger tous les liens existants
+        $content = preg_replace_callback('/<a[^>]*>.*?<\/a>/is', function($match) use (&$placeholders, &$placeholder_index) {
+            $key = '###PLACEHOLDER_' . $placeholder_index . '###';
+            $placeholders[$key] = $match[0];
+            $placeholder_index++;
+            return $key;
+        }, $content);
+
+        // Protéger les balises HTML (sauf le contenu texte)
+        $content = preg_replace_callback('/<[^>]+>/', function($match) use (&$placeholders, &$placeholder_index) {
+            $key = '###PLACEHOLDER_' . $placeholder_index . '###';
+            $placeholders[$key] = $match[0];
+            $placeholder_index++;
+            return $key;
+        }, $content);
+
+        // Protéger les shortcodes WordPress
+        $content = preg_replace_callback('/\[[^\]]+\]/', function($match) use (&$placeholders, &$placeholder_index) {
+            $key = '###PLACEHOLDER_' . $placeholder_index . '###';
+            $placeholders[$key] = $match[0];
+            $placeholder_index++;
+            return $key;
+        }, $content);
+
+        // Maintenant faire le remplacement sur le texte pur
+        // Utiliser une recherche insensible à la casse mais préserver la casse originale
+        $pattern = '/\b(' . preg_quote($search, '/') . ')\b/iu';
+
+        $replaced = 0;
+        $content = preg_replace_callback($pattern, function($match) use ($replacement, $limit, &$replaced) {
+            if ($replaced >= $limit) {
+                return $match[0];
+            }
+            $replaced++;
+            // Remplacer en préservant la casse si nécessaire
+            return $replacement;
+        }, $content);
+
+        // Restaurer les placeholders
+        foreach ($placeholders as $key => $value) {
+            $content = str_replace($key, $value, $content);
+        }
+
+        return $content;
     }
 
     /**
@@ -196,87 +254,165 @@ class SIL_Auto_Linker {
         $post = get_post($source_id);
 
         if (!$post) {
-            return false;
+            return array('success' => false, 'message' => 'Article source introuvable');
         }
 
         $content = $post->post_content;
+        $original_content = $content;
 
         // Créer le lien HTML
-        $url = get_permalink($target_id);
-        $title = esc_attr(get_the_title($target_id));
+        $link_html = $this->create_link_html($target_id, $anchor, 'sil-manual-link');
 
-        $link_attributes = 'href="' . esc_url($url) . '"';
-        $link_attributes .= ' title="' . $title . '"';
+        // Essayer de remplacer le texte dans le contenu
+        $content = $this->smart_replace($content, $anchor, $link_html, 1);
 
-        if (isset($this->options['open_in_new_tab']) && $this->options['open_in_new_tab']) {
-            $link_attributes .= ' target="_blank" rel="noopener"';
+        // Si le contenu n'a pas changé, essayer d'autres méthodes
+        if ($content === $original_content) {
+            // Méthode 2: Recherche plus flexible (ignorer les accents, etc.)
+            $content = $this->flexible_replace($original_content, $anchor, $link_html);
         }
 
-        $link_html = '<a ' . $link_attributes . ' class="sil-manual-link">' . esc_html($anchor) . '</a>';
+        // Si toujours pas de changement, ajouter une section "Articles connexes"
+        if ($content === $original_content) {
+            $content = $this->add_related_link($content, $target_id, $anchor);
+        }
 
-        // Échapper les caractères spéciaux pour le regex
-        $escaped_anchor = preg_quote($anchor, '/');
-
-        // Pattern pour trouver le mot-clé (pas dans un lien existant)
-        $pattern = '/(?<![<\w])(' . $escaped_anchor . ')(?![^<]*>)(?![^<]*<\/a>)/iu';
-
-        // Vérifier si le pattern existe
-        if (!preg_match($pattern, $content)) {
-            // Si le texte exact n'est pas trouvé, ajouter le lien à la fin d'un paragraphe pertinent
-            $content = $this->append_link_to_content($content, $anchor, $link_html);
-        } else {
-            // Remplacer la première occurrence
-            $content = preg_replace($pattern, $link_html, $content, 1);
+        // Vérifier que le contenu a bien changé
+        if ($content === $original_content) {
+            return array('success' => false, 'message' => 'Impossible d\'insérer le lien');
         }
 
         // Mettre à jour le post
         $updated = wp_update_post(array(
             'ID' => $source_id,
             'post_content' => $content
-        ));
+        ), true);
 
-        if ($updated && !is_wp_error($updated)) {
-            // Enregistrer le lien
-            $this->record_link($source_id, $target_id, $anchor, false);
-
-            // Mettre à jour la suggestion si elle existe
-            if ($suggestion_id > 0) {
-                global $wpdb;
-                $wpdb->update(
-                    $wpdb->prefix . 'sil_suggestions',
-                    array(
-                        'status' => 'applied',
-                        'applied_at' => current_time('mysql')
-                    ),
-                    array('id' => $suggestion_id),
-                    array('%s', '%s'),
-                    array('%d')
-                );
-            }
-
-            return true;
+        if (is_wp_error($updated)) {
+            return array('success' => false, 'message' => $updated->get_error_message());
         }
 
-        return false;
+        // Enregistrer le lien
+        $this->record_link($source_id, $target_id, $anchor, false);
+
+        // Mettre à jour la suggestion si elle existe
+        if ($suggestion_id > 0) {
+            global $wpdb;
+            $wpdb->update(
+                $wpdb->prefix . 'sil_suggestions',
+                array(
+                    'status' => 'applied',
+                    'applied_at' => current_time('mysql')
+                ),
+                array('id' => $suggestion_id),
+                array('%s', '%s'),
+                array('%d')
+            );
+        }
+
+        return array('success' => true, 'message' => 'Lien inséré avec succès');
     }
 
     /**
-     * Ajouter un lien à la fin du contenu
+     * Remplacement flexible (pour les textes avec variations)
      */
-    private function append_link_to_content($content, $anchor, $link_html) {
-        // Trouver le dernier paragraphe
-        $last_p_pos = strrpos($content, '</p>');
+    private function flexible_replace($content, $search, $replacement) {
+        // Essayer différentes variations du texte
+        $variations = array(
+            $search,
+            mb_strtolower($search),
+            mb_strtoupper($search),
+            ucfirst(mb_strtolower($search)),
+            ucwords(mb_strtolower($search))
+        );
 
-        if ($last_p_pos !== false) {
-            // Insérer avant le dernier </p>
-            $insert_text = ' Voir aussi : ' . $link_html;
-            $content = substr_replace($content, $insert_text, $last_p_pos, 0);
-        } else {
-            // Ajouter à la fin
-            $content .= '<p>Voir aussi : ' . $link_html . '</p>';
+        foreach ($variations as $variation) {
+            $new_content = $this->smart_replace($content, $variation, $replacement, 1);
+            if ($new_content !== $content) {
+                return $new_content;
+            }
+        }
+
+        // Essayer une recherche partielle (premier mot seulement si multi-mots)
+        $words = explode(' ', $search);
+        if (count($words) > 1) {
+            // Essayer avec juste le premier et dernier mot
+            $partial = $words[0];
+            if (mb_strlen($partial) >= 4) {
+                $new_content = $this->smart_replace($content, $partial, $replacement, 1);
+                if ($new_content !== $content) {
+                    return $new_content;
+                }
+            }
         }
 
         return $content;
+    }
+
+    /**
+     * Ajouter un lien dans une section "Articles connexes"
+     */
+    private function add_related_link($content, $target_id, $anchor) {
+        $url = get_permalink($target_id);
+        $title = get_the_title($target_id);
+
+        // Chercher si une section articles connexes existe déjà
+        if (strpos($content, 'sil-related-links') !== false) {
+            // Ajouter à la liste existante
+            $link_item = '<li><a href="' . esc_url($url) . '" class="sil-manual-link">' . esc_html($title) . '</a></li>';
+
+            $content = preg_replace(
+                '/(<ul class="sil-related-links">)(.*?)(<\/ul>)/s',
+                '$1$2' . $link_item . '$3',
+                $content
+            );
+        } else {
+            // Créer une nouvelle section
+            $related_section = "\n\n" . '<!-- wp:heading {"level":3} -->' . "\n";
+            $related_section .= '<h3 class="sil-related-title">Articles connexes</h3>' . "\n";
+            $related_section .= '<!-- /wp:heading -->' . "\n\n";
+            $related_section .= '<ul class="sil-related-links">' . "\n";
+            $related_section .= '<li><a href="' . esc_url($url) . '" class="sil-manual-link">' . esc_html($title) . '</a></li>' . "\n";
+            $related_section .= '</ul>';
+
+            $content .= $related_section;
+        }
+
+        return $content;
+    }
+
+    /**
+     * Insérer plusieurs liens en masse
+     */
+    public function insert_links_bulk($links) {
+        $results = array(
+            'success' => 0,
+            'failed' => 0,
+            'details' => array()
+        );
+
+        foreach ($links as $link) {
+            $result = $this->insert_link_manually(
+                $link['source_id'],
+                $link['target_id'],
+                $link['anchor'],
+                isset($link['suggestion_id']) ? $link['suggestion_id'] : 0
+            );
+
+            if ($result['success']) {
+                $results['success']++;
+            } else {
+                $results['failed']++;
+            }
+
+            $results['details'][] = array(
+                'source_id' => $link['source_id'],
+                'target_id' => $link['target_id'],
+                'result' => $result
+            );
+        }
+
+        return $results;
     }
 
     /**
@@ -388,7 +524,7 @@ class SIL_Auto_Linker {
             // Vérifier si c'est un lien interne
             $site_url = home_url();
 
-            if (strpos($url, $site_url) === 0 || strpos($url, '/') === 0) {
+            if (strpos($url, $site_url) === 0 || (strpos($url, '/') === 0 && strpos($url, '//') !== 0)) {
                 // C'est un lien interne
                 $target_id = url_to_postid($url);
 
@@ -428,7 +564,9 @@ class SIL_Auto_Linker {
 
         foreach ($posts as $post) {
             $links = $this->scan_existing_links($post->ID);
-            $total_links += count($links);
+            if (is_array($links)) {
+                $total_links += count($links);
+            }
             $scanned++;
         }
 

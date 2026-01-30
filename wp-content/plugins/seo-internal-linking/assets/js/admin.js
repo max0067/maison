@@ -11,6 +11,7 @@
          */
         init: function() {
             this.bindEvents();
+            this.updateSelectedCount();
         },
 
         /**
@@ -34,6 +35,215 @@
 
             // Export CSV
             $('#sil-export-csv').on('click', this.exportCSV.bind(this));
+
+            // Selection multiple
+            $('#sil-select-all, #sil-select-all-header').on('change', this.toggleSelectAll.bind(this));
+            $(document).on('change', '.sil-select-item', this.updateSelectedCount.bind(this));
+
+            // Bulk actions
+            $('#sil-bulk-insert').on('click', this.bulkInsert.bind(this));
+            $('#sil-bulk-dismiss').on('click', this.bulkDismiss.bind(this));
+        },
+
+        /**
+         * Toggle select all
+         */
+        toggleSelectAll: function(e) {
+            var checked = $(e.currentTarget).prop('checked');
+            $('#sil-select-all, #sil-select-all-header').prop('checked', checked);
+            $('.sil-select-item').prop('checked', checked);
+            this.updateSelectedCount();
+        },
+
+        /**
+         * Update selected count
+         */
+        updateSelectedCount: function() {
+            var count = $('.sil-select-item:checked').length;
+            $('#sil-selected-num').text(count);
+
+            // Enable/disable bulk action buttons
+            $('#sil-bulk-insert, #sil-bulk-dismiss').prop('disabled', count === 0);
+        },
+
+        /**
+         * Get selected items data
+         */
+        getSelectedItems: function() {
+            var items = [];
+            $('.sil-select-item:checked').each(function() {
+                var $row = $(this).closest('tr');
+                items.push({
+                    suggestion_id: $row.data('suggestion-id'),
+                    source_id: $row.data('source'),
+                    target_id: $row.data('target'),
+                    anchor: $row.data('anchor'),
+                    $row: $row
+                });
+            });
+            return items;
+        },
+
+        /**
+         * Bulk insert links
+         */
+        bulkInsert: function(e) {
+            e.preventDefault();
+
+            var items = this.getSelectedItems();
+            if (items.length === 0) {
+                alert('Aucune suggestion sélectionnée.');
+                return;
+            }
+
+            if (!confirm('Voulez-vous insérer ' + items.length + ' lien(s) ?')) {
+                return;
+            }
+
+            var $button = $('#sil-bulk-insert');
+            var $status = $('#sil-bulk-status');
+            var self = this;
+
+            $button.prop('disabled', true);
+            $status.html('<span class="spinner is-active" style="float: none;"></span> Insertion en cours...');
+
+            // Marquer les lignes en cours de traitement
+            items.forEach(function(item) {
+                item.$row.addClass('sil-processing');
+            });
+
+            // Préparer les données
+            var linksData = items.map(function(item) {
+                return {
+                    source_id: item.source_id,
+                    target_id: item.target_id,
+                    anchor: item.anchor,
+                    suggestion_id: item.suggestion_id
+                };
+            });
+
+            $.ajax({
+                url: silAdmin.ajaxUrl,
+                type: 'POST',
+                data: {
+                    action: 'sil_bulk_insert_links',
+                    nonce: silAdmin.nonce,
+                    links: linksData
+                },
+                success: function(response) {
+                    if (response.success) {
+                        $status.html('<span style="color: green;">' + response.data.message + '</span>');
+
+                        // Mettre à jour l'interface
+                        response.data.details.forEach(function(detail, index) {
+                            var $row = items[index].$row;
+                            $row.removeClass('sil-processing');
+
+                            if (detail.result.success) {
+                                self.markRowAsApplied($row);
+                            } else {
+                                $row.find('.sil-status').html('<span style="color: orange;">Échec</span>');
+                            }
+                        });
+
+                        self.updateSelectedCount();
+                    } else {
+                        $status.html('<span style="color: red;">' + response.data + '</span>');
+                        items.forEach(function(item) {
+                            item.$row.removeClass('sil-processing');
+                        });
+                    }
+                    $button.prop('disabled', false);
+                },
+                error: function() {
+                    $status.html('<span style="color: red;">Erreur de connexion.</span>');
+                    items.forEach(function(item) {
+                        item.$row.removeClass('sil-processing');
+                    });
+                    $button.prop('disabled', false);
+                }
+            });
+        },
+
+        /**
+         * Bulk dismiss suggestions
+         */
+        bulkDismiss: function(e) {
+            e.preventDefault();
+
+            var items = this.getSelectedItems();
+            if (items.length === 0) {
+                alert('Aucune suggestion sélectionnée.');
+                return;
+            }
+
+            if (!confirm('Voulez-vous ignorer ' + items.length + ' suggestion(s) ?')) {
+                return;
+            }
+
+            var $button = $('#sil-bulk-dismiss');
+            var $status = $('#sil-bulk-status');
+            var self = this;
+            var completed = 0;
+            var total = items.length;
+
+            $button.prop('disabled', true);
+            $status.text('Traitement en cours... 0/' + total);
+
+            // Traiter les éléments un par un
+            items.forEach(function(item) {
+                $.ajax({
+                    url: silAdmin.ajaxUrl,
+                    type: 'POST',
+                    data: {
+                        action: 'sil_dismiss_suggestion',
+                        nonce: silAdmin.nonce,
+                        suggestion_id: item.suggestion_id
+                    },
+                    success: function(response) {
+                        completed++;
+                        $status.text('Traitement en cours... ' + completed + '/' + total);
+
+                        if (response.success) {
+                            self.markRowAsDismissed(item.$row);
+                        }
+
+                        if (completed === total) {
+                            $status.html('<span style="color: green;">' + total + ' suggestion(s) ignorée(s).</span>');
+                            self.updateSelectedCount();
+                            $button.prop('disabled', false);
+                        }
+                    },
+                    error: function() {
+                        completed++;
+                        if (completed === total) {
+                            $button.prop('disabled', false);
+                        }
+                    }
+                });
+            });
+        },
+
+        /**
+         * Mark row as applied
+         */
+        markRowAsApplied: function($row) {
+            $row.addClass('sil-row-success');
+            $row.find('.sil-status').removeClass('sil-status-pending').addClass('sil-status-applied').text('Appliqué');
+            $row.find('.sil-select-item').remove();
+            $row.find('td:last').html('<span class="dashicons dashicons-yes-alt" style="color: green;"></span>');
+            $row.data('status', 'applied');
+        },
+
+        /**
+         * Mark row as dismissed
+         */
+        markRowAsDismissed: function($row) {
+            $row.addClass('sil-row-dismissed');
+            $row.find('.sil-status').removeClass('sil-status-pending').addClass('sil-status-rejected').text('Ignoré');
+            $row.find('.sil-select-item').remove();
+            $row.find('.sil-insert-link, .sil-dismiss-suggestion').remove();
+            $row.data('status', 'rejected');
         },
 
         /**
@@ -200,18 +410,15 @@
         insertLink: function(e) {
             e.preventDefault();
 
-            if (!confirm(silAdmin.strings.confirm_insert)) {
-                return;
-            }
-
             var $button = $(e.currentTarget);
             var $row = $button.closest('tr');
             var sourceId = $button.data('source');
             var targetId = $button.data('target');
             var anchor = $button.data('anchor');
             var suggestionId = $button.data('suggestion');
+            var self = this;
 
-            $button.prop('disabled', true);
+            $button.prop('disabled', true).text('...');
 
             $.ajax({
                 url: silAdmin.ajaxUrl,
@@ -226,16 +433,14 @@
                 },
                 success: function(response) {
                     if (response.success) {
-                        $row.addClass('sil-row-success');
-                        $row.find('.sil-status').removeClass('sil-status-pending').addClass('sil-status-applied').text('Appliqué');
-                        $button.closest('td').html('<span class="dashicons dashicons-yes-alt" style="color: green;"></span>');
+                        self.markRowAsApplied($row);
                     } else {
-                        $button.prop('disabled', false);
-                        alert(response.data);
+                        $button.prop('disabled', false).text('Insérer');
+                        alert(response.data || 'Erreur lors de l\'insertion.');
                     }
                 },
                 error: function() {
-                    $button.prop('disabled', false);
+                    $button.prop('disabled', false).text('Insérer');
                     alert(silAdmin.strings.error);
                 }
             });
@@ -250,6 +455,7 @@
             var $button = $(e.currentTarget);
             var $row = $button.closest('tr');
             var suggestionId = $button.data('suggestion');
+            var self = this;
 
             $button.prop('disabled', true);
 
@@ -263,9 +469,7 @@
                 },
                 success: function(response) {
                     if (response.success) {
-                        $row.addClass('sil-row-dismissed');
-                        $row.find('.sil-status').removeClass('sil-status-pending').addClass('sil-status-rejected').text('Ignoré');
-                        $row.find('.sil-insert-link, .sil-dismiss-suggestion').remove();
+                        self.markRowAsDismissed($row);
                     } else {
                         $button.prop('disabled', false);
                         alert(response.data);

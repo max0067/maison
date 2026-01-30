@@ -432,8 +432,14 @@ class SIL_Admin {
             $suggestions = $suggester->get_suggestions($post_id, 'all');
             $post = get_post($post_id);
         } else {
-            $suggestions = $suggester->get_all_pending_suggestions(50);
+            $suggestions = $suggester->get_all_pending_suggestions(100);
             $post = null;
+        }
+
+        // Compter les suggestions en attente
+        $pending_count = 0;
+        foreach ($suggestions as $s) {
+            if ($s->status === 'pending') $pending_count++;
         }
         ?>
         <div class="wrap sil-admin">
@@ -453,22 +459,50 @@ class SIL_Admin {
                     <p><?php _e('Aucune suggestion disponible. Lancez une analyse pour générer des suggestions.', 'seo-internal-linking'); ?></p>
                 </div>
             <?php else : ?>
-                <table class="wp-list-table widefat fixed striped">
+                <!-- Barre d'actions en masse -->
+                <div class="sil-bulk-actions">
+                    <label>
+                        <input type="checkbox" id="sil-select-all">
+                        <?php _e('Tout sélectionner', 'seo-internal-linking'); ?>
+                    </label>
+                    <span class="sil-selected-count">(<span id="sil-selected-num">0</span> <?php _e('sélectionné(s)', 'seo-internal-linking'); ?>)</span>
+
+                    <button type="button" class="button button-primary" id="sil-bulk-insert" disabled>
+                        <?php _e('Insérer la sélection', 'seo-internal-linking'); ?>
+                    </button>
+                    <button type="button" class="button" id="sil-bulk-dismiss" disabled>
+                        <?php _e('Ignorer la sélection', 'seo-internal-linking'); ?>
+                    </button>
+
+                    <span id="sil-bulk-status"></span>
+                </div>
+
+                <table class="wp-list-table widefat fixed striped" id="sil-suggestions-table">
                     <thead>
                         <tr>
+                            <th style="width: 30px;"><input type="checkbox" id="sil-select-all-header"></th>
                             <th><?php _e('Article source', 'seo-internal-linking'); ?></th>
                             <th><?php _e('Article cible', 'seo-internal-linking'); ?></th>
                             <th><?php _e('Texte d\'ancrage', 'seo-internal-linking'); ?></th>
-                            <th><?php _e('Score', 'seo-internal-linking'); ?></th>
-                            <th><?php _e('Statut', 'seo-internal-linking'); ?></th>
-                            <th><?php _e('Actions', 'seo-internal-linking'); ?></th>
+                            <th style="width: 80px;"><?php _e('Score', 'seo-internal-linking'); ?></th>
+                            <th style="width: 100px;"><?php _e('Statut', 'seo-internal-linking'); ?></th>
+                            <th style="width: 180px;"><?php _e('Actions', 'seo-internal-linking'); ?></th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php foreach ($suggestions as $suggestion) : ?>
-                            <tr data-suggestion-id="<?php echo $suggestion->id; ?>">
+                            <tr data-suggestion-id="<?php echo $suggestion->id; ?>"
+                                data-source="<?php echo $suggestion->source_post_id; ?>"
+                                data-target="<?php echo $suggestion->target_post_id; ?>"
+                                data-anchor="<?php echo esc_attr($suggestion->anchor_text); ?>"
+                                data-status="<?php echo $suggestion->status; ?>">
                                 <td>
-                                    <a href="<?php echo get_edit_post_link($suggestion->source_post_id); ?>">
+                                    <?php if ($suggestion->status === 'pending') : ?>
+                                        <input type="checkbox" class="sil-select-item">
+                                    <?php endif; ?>
+                                </td>
+                                <td>
+                                    <a href="<?php echo get_edit_post_link($suggestion->source_post_id); ?>" target="_blank">
                                         <?php echo esc_html($suggestion->source_title ?? get_the_title($suggestion->source_post_id)); ?>
                                     </a>
                                 </td>
@@ -504,13 +538,47 @@ class SIL_Admin {
                                             <?php _e('Ignorer', 'seo-internal-linking'); ?>
                                         </button>
                                     <?php elseif ($suggestion->status === 'applied') : ?>
-                                        <span class="dashicons dashicons-yes-alt" style="color: green;"></span>
+                                        <span class="dashicons dashicons-yes-alt" style="color: green;" title="<?php _e('Appliqué', 'seo-internal-linking'); ?>"></span>
+                                    <?php elseif ($suggestion->status === 'rejected') : ?>
+                                        <span class="dashicons dashicons-dismiss" style="color: #999;" title="<?php _e('Ignoré', 'seo-internal-linking'); ?>"></span>
                                     <?php endif; ?>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>
                 </table>
+
+                <p class="description">
+                    <?php printf(__('Total : %d suggestions (%d en attente)', 'seo-internal-linking'), count($suggestions), $pending_count); ?>
+                </p>
+
+                <style>
+                .sil-bulk-actions {
+                    background: #fff;
+                    padding: 15px;
+                    margin-bottom: 15px;
+                    border: 1px solid #c3c4c7;
+                    border-radius: 4px;
+                    display: flex;
+                    align-items: center;
+                    gap: 15px;
+                    flex-wrap: wrap;
+                }
+                .sil-selected-count {
+                    color: #666;
+                    margin-right: 10px;
+                }
+                #sil-bulk-status {
+                    margin-left: auto;
+                }
+                .sil-select-item {
+                    width: 18px;
+                    height: 18px;
+                }
+                tr.sil-processing {
+                    opacity: 0.5;
+                }
+                </style>
             <?php endif; ?>
         </div>
         <?php
