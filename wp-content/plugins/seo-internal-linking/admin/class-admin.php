@@ -297,7 +297,15 @@ class SIL_Admin {
      */
     public function enqueue_admin_assets($hook) {
         // Charger sur les pages du plugin uniquement
-        if (strpos($hook, 'seo-internal-linking') === false && strpos($hook, 'sil-') === false && $hook !== 'post.php' && $hook !== 'post-new.php') {
+        $is_plugin_page = (
+            strpos($hook, 'seo-internal-linking') !== false ||
+            strpos($hook, 'sil-') !== false ||
+            strpos($hook, '_page_sil') !== false ||
+            $hook === 'post.php' ||
+            $hook === 'post-new.php'
+        );
+
+        if (!$is_plugin_page) {
             return;
         }
 

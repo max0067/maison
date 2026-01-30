@@ -694,9 +694,12 @@
 
         bindEvents: function() {
             var self = this;
+            console.log('SIL Generator: Binding events...');
 
             // Générer l'article
-            $(document).on('click', '#sil-generate-article', function() {
+            $(document).on('click', '#sil-generate-article', function(e) {
+                e.preventDefault();
+                console.log('SIL Generator: Button clicked');
                 self.generateArticle();
             });
 
@@ -771,7 +774,10 @@
 
         generateArticle: function() {
             var self = this;
+            console.log('SIL Generator: generateArticle called');
+
             var keyword = $('#sil-keyword').val().trim();
+            console.log('SIL Generator: keyword =', keyword);
 
             if (!keyword) {
                 alert('Veuillez entrer un mot-clé.');
@@ -782,6 +788,8 @@
 
             var $btn = $('#sil-generate-article, #sil-regenerate');
             var $status = $('#sil-generate-status');
+
+            console.log('SIL Generator: silAdmin =', typeof silAdmin !== 'undefined' ? 'defined' : 'undefined');
 
             $btn.prop('disabled', true);
             $status.html('<span class="spinner is-active"></span> Génération en cours... (peut prendre 30-60 secondes)');
@@ -974,8 +982,20 @@
 
     // Initialize Generator when DOM is ready
     $(document).ready(function() {
+        console.log('SIL Admin JS loaded, hook check passed');
+
         if ($('#sil-keyword').length) {
+            console.log('SIL Generator: Found #sil-keyword element');
+            console.log('SIL Generator: silAdmin available:', typeof silAdmin !== 'undefined');
             SIL_Generator.init();
+            console.log('SIL Generator: Initialized successfully');
+
+            // Fallback direct binding
+            $('#sil-generate-article').on('click', function(e) {
+                e.preventDefault();
+                console.log('SIL Generator: Direct click handler fired');
+                SIL_Generator.generateArticle();
+            });
         }
     });
 
