@@ -118,6 +118,16 @@ class SIL_Admin {
             'sil-settings',
             array($this, 'render_settings_page')
         );
+
+        // Sous-menu Diagnostic
+        add_submenu_page(
+            'seo-internal-linking',
+            __('Diagnostic', 'seo-internal-linking'),
+            __('Diagnostic', 'seo-internal-linking'),
+            'manage_options',
+            'sil-diagnostic',
+            array($this, 'render_diagnostic_page')
+        );
     }
 
     /**
@@ -1012,6 +1022,201 @@ class SIL_Admin {
         );
 
         return isset($labels[$status]) ? $labels[$status] : $status;
+    }
+
+    /**
+     * Afficher la page de diagnostic
+     */
+    public function render_diagnostic_page() {
+        $diagnostic = SIL_Diagnostic::run_all();
+        ?>
+        <div class="wrap sil-admin">
+            <h1><?php _e('Diagnostic du plugin', 'seo-internal-linking'); ?></h1>
+
+            <div class="notice notice-info">
+                <p><?php _e('Cette page vous permet de vérifier que le plugin fonctionne correctement et de réparer les problèmes éventuels.', 'seo-internal-linking'); ?></p>
+            </div>
+
+            <!-- Boutons d'action -->
+            <div class="sil-actions-bar">
+                <button type="button" class="button button-primary" id="sil-fix-tables">
+                    <?php _e('Réparer les tables et options', 'seo-internal-linking'); ?>
+                </button>
+                <button type="button" class="button" id="sil-refresh-diagnostic">
+                    <?php _e('Actualiser le diagnostic', 'seo-internal-linking'); ?>
+                </button>
+                <span id="sil-diagnostic-status"></span>
+            </div>
+
+            <!-- État des tables -->
+            <div class="sil-diagnostic-section">
+                <h2><?php _e('État des tables de la base de données', 'seo-internal-linking'); ?></h2>
+                <table class="wp-list-table widefat fixed striped">
+                    <thead>
+                        <tr>
+                            <th><?php _e('Table', 'seo-internal-linking'); ?></th>
+                            <th><?php _e('Existe', 'seo-internal-linking'); ?></th>
+                            <th><?php _e('Nombre d\'entrées', 'seo-internal-linking'); ?></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($diagnostic['tables'] as $table => $info) : ?>
+                            <tr>
+                                <td><code><?php echo esc_html($table); ?></code></td>
+                                <td>
+                                    <?php if ($info['exists']) : ?>
+                                        <span style="color: green;">&#10004; Oui</span>
+                                    <?php else : ?>
+                                        <span style="color: red;">&#10008; Non</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td><?php echo $info['count']; ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Articles disponibles -->
+            <div class="sil-diagnostic-section">
+                <h2><?php _e('Articles disponibles', 'seo-internal-linking'); ?></h2>
+
+                <h3><?php _e('Types de posts configurés', 'seo-internal-linking'); ?></h3>
+                <p>
+                    <?php if (!empty($diagnostic['posts']['configured_types'])) : ?>
+                        <strong><?php echo implode(', ', $diagnostic['posts']['configured_types']); ?></strong>
+                    <?php else : ?>
+                        <span style="color: red;"><?php _e('Aucun type configuré ! Cliquez sur "Réparer" ci-dessus.', 'seo-internal-linking'); ?></span>
+                    <?php endif; ?>
+                </p>
+
+                <h3><?php _e('Nombre d\'articles par type', 'seo-internal-linking'); ?></h3>
+                <table class="wp-list-table widefat fixed striped">
+                    <thead>
+                        <tr>
+                            <th><?php _e('Type', 'seo-internal-linking'); ?></th>
+                            <th><?php _e('Nombre d\'articles publiés', 'seo-internal-linking'); ?></th>
+                            <th><?php _e('Configuré', 'seo-internal-linking'); ?></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($diagnostic['posts']['available_types'] as $type => $info) : ?>
+                            <tr>
+                                <td><strong><?php echo esc_html($info['label']); ?></strong> (<?php echo $type; ?>)</td>
+                                <td><?php echo $info['count']; ?></td>
+                                <td>
+                                    <?php if (in_array($type, $diagnostic['posts']['configured_types'])) : ?>
+                                        <span style="color: green;">&#10004; Oui</span>
+                                    <?php else : ?>
+                                        <span style="color: orange;">&#10008; Non</span>
+                                    <?php endif; ?>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+
+                <p><strong><?php _e('Total d\'articles à analyser:', 'seo-internal-linking'); ?></strong> <?php echo $diagnostic['posts']['total']; ?></p>
+
+                <?php if (!empty($diagnostic['posts']['sample_posts'])) : ?>
+                    <h3><?php _e('Exemples d\'articles trouvés', 'seo-internal-linking'); ?></h3>
+                    <ul>
+                        <?php foreach ($diagnostic['posts']['sample_posts'] as $post) : ?>
+                            <li>
+                                <a href="<?php echo get_edit_post_link($post['ID']); ?>">
+                                    <?php echo esc_html($post['title']); ?>
+                                </a>
+                                (ID: <?php echo $post['ID']; ?>, Type: <?php echo $post['type']; ?>)
+                            </li>
+                        <?php endforeach; ?>
+                    </ul>
+                <?php else : ?>
+                    <div class="notice notice-warning">
+                        <p><?php _e('Aucun article trouvé ! Vérifiez que vous avez des articles publiés.', 'seo-internal-linking'); ?></p>
+                    </div>
+                <?php endif; ?>
+            </div>
+
+            <!-- Options -->
+            <div class="sil-diagnostic-section">
+                <h2><?php _e('Options du plugin', 'seo-internal-linking'); ?></h2>
+                <pre style="background: #f5f5f5; padding: 15px; overflow: auto;"><?php print_r($diagnostic['options']['merged']); ?></pre>
+            </div>
+
+            <!-- Permissions -->
+            <div class="sil-diagnostic-section">
+                <h2><?php _e('Permissions', 'seo-internal-linking'); ?></h2>
+                <ul>
+                    <li>
+                        <?php _e('Peut gérer les options:', 'seo-internal-linking'); ?>
+                        <?php echo $diagnostic['permissions']['can_manage_options'] ? '<span style="color:green;">Oui</span>' : '<span style="color:red;">Non</span>'; ?>
+                    </li>
+                    <li>
+                        <?php _e('Peut éditer les posts:', 'seo-internal-linking'); ?>
+                        <?php echo $diagnostic['permissions']['can_edit_posts'] ? '<span style="color:green;">Oui</span>' : '<span style="color:red;">Non</span>'; ?>
+                    </li>
+                </ul>
+            </div>
+
+            <script>
+            jQuery(document).ready(function($) {
+                $('#sil-fix-tables').on('click', function() {
+                    var $btn = $(this);
+                    var $status = $('#sil-diagnostic-status');
+
+                    $btn.prop('disabled', true);
+                    $status.text('<?php _e('Réparation en cours...', 'seo-internal-linking'); ?>');
+
+                    $.ajax({
+                        url: silAdmin.ajaxUrl,
+                        type: 'POST',
+                        data: {
+                            action: 'sil_fix_tables',
+                            nonce: silAdmin.nonce
+                        },
+                        success: function(response) {
+                            if (response.success) {
+                                $status.html('<span style="color:green;">' + response.data.message + '</span>');
+                                setTimeout(function() {
+                                    location.reload();
+                                }, 1500);
+                            } else {
+                                $status.html('<span style="color:red;">' + response.data + '</span>');
+                            }
+                            $btn.prop('disabled', false);
+                        },
+                        error: function() {
+                            $status.html('<span style="color:red;"><?php _e('Erreur lors de la réparation.', 'seo-internal-linking'); ?></span>');
+                            $btn.prop('disabled', false);
+                        }
+                    });
+                });
+
+                $('#sil-refresh-diagnostic').on('click', function() {
+                    location.reload();
+                });
+            });
+            </script>
+
+            <style>
+            .sil-diagnostic-section {
+                background: #fff;
+                border: 1px solid #c3c4c7;
+                border-radius: 4px;
+                padding: 20px;
+                margin: 20px 0;
+            }
+            .sil-diagnostic-section h2 {
+                margin-top: 0;
+                border-bottom: 1px solid #eee;
+                padding-bottom: 10px;
+            }
+            .sil-diagnostic-section h3 {
+                margin-top: 20px;
+            }
+            </style>
+        </div>
+        <?php
     }
 }
 

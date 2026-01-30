@@ -67,6 +67,7 @@ class SEO_Internal_Linking {
         require_once SIL_PLUGIN_DIR . 'includes/class-link-suggester.php';
         require_once SIL_PLUGIN_DIR . 'includes/class-auto-linker.php';
         require_once SIL_PLUGIN_DIR . 'includes/class-statistics.php';
+        require_once SIL_PLUGIN_DIR . 'includes/class-diagnostic.php';
 
         if (is_admin()) {
             require_once SIL_PLUGIN_DIR . 'admin/class-admin.php';
@@ -125,6 +126,8 @@ class SEO_Internal_Linking {
         add_action('wp_ajax_sil_analyze_post', array($this, 'ajax_analyze_post'));
         add_action('wp_ajax_sil_insert_link', array($this, 'ajax_insert_link'));
         add_action('wp_ajax_sil_bulk_analyze', array($this, 'ajax_bulk_analyze'));
+        add_action('wp_ajax_sil_run_diagnostic', array($this, 'ajax_run_diagnostic'));
+        add_action('wp_ajax_sil_fix_tables', array($this, 'ajax_fix_tables'));
 
         // Cron pour l'analyse automatique
         add_action('sil_daily_analysis', array($this, 'run_daily_analysis'));
@@ -447,6 +450,43 @@ class SEO_Internal_Linking {
 
         // Mettre à jour les statistiques
         $stats->update_all_statistics();
+    }
+
+    /**
+     * AJAX: Exécuter le diagnostic
+     */
+    public function ajax_run_diagnostic() {
+        check_ajax_referer('sil_nonce', 'nonce');
+
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(__('Permission refusée.', 'seo-internal-linking'));
+        }
+
+        $results = SIL_Diagnostic::run_all();
+        wp_send_json_success($results);
+    }
+
+    /**
+     * AJAX: Réparer les tables et options
+     */
+    public function ajax_fix_tables() {
+        check_ajax_referer('sil_nonce', 'nonce');
+
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(__('Permission refusée.', 'seo-internal-linking'));
+        }
+
+        // Recréer les tables
+        $table_results = SIL_Diagnostic::recreate_tables();
+
+        // Réparer les options
+        $options = SIL_Diagnostic::fix_options();
+
+        wp_send_json_success(array(
+            'tables' => $table_results,
+            'options' => $options,
+            'message' => __('Réparation effectuée avec succès !', 'seo-internal-linking')
+        ));
     }
 }
 
