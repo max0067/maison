@@ -1751,6 +1751,63 @@ class SIL_Admin {
                 margin: 0;
             }
             </style>
+
+            <script>
+            jQuery(document).ready(function($) {
+                console.log('SIL Generator Inline: Loaded');
+
+                $('#sil-generate-article').on('click', function(e) {
+                    e.preventDefault();
+                    console.log('SIL Generator Inline: Button clicked');
+
+                    var keyword = $('#sil-keyword').val().trim();
+                    if (!keyword) {
+                        alert('Veuillez entrer un mot-clé.');
+                        return;
+                    }
+
+                    var $btn = $(this);
+                    var $status = $('#sil-generate-status');
+
+                    $btn.prop('disabled', true);
+                    $status.html('<span class="spinner is-active"></span> Génération en cours... (30-60 secondes)');
+
+                    $.ajax({
+                        url: '<?php echo admin_url('admin-ajax.php'); ?>',
+                        type: 'POST',
+                        data: {
+                            action: 'sil_generate_article',
+                            nonce: '<?php echo wp_create_nonce('sil_nonce'); ?>',
+                            keyword: keyword
+                        },
+                        timeout: 180000,
+                        success: function(response) {
+                            $btn.prop('disabled', false);
+                            console.log('SIL Generator: Response', response);
+
+                            if (response.success) {
+                                $('#sil-preview-title').val(response.data.title || '');
+                                $('#sil-preview-meta').val(response.data.meta_description || '');
+                                $('#sil-preview-content').val(response.data.content || '');
+                                $('#sil-step-preview').show();
+                                $status.html('<span style="color: green;">&#10004; Article généré !</span>');
+
+                                $('html, body').animate({
+                                    scrollTop: $('#sil-step-preview').offset().top - 50
+                                }, 500);
+                            } else {
+                                $status.html('<span style="color: red;">Erreur: ' + response.data + '</span>');
+                            }
+                        },
+                        error: function(xhr, status, error) {
+                            $btn.prop('disabled', false);
+                            console.log('SIL Generator: Error', status, error);
+                            $status.html('<span style="color: red;">Erreur: ' + (status === 'timeout' ? 'Délai dépassé' : error) + '</span>');
+                        }
+                    });
+                });
+            });
+            </script>
         </div>
         <?php
     }
