@@ -1,0 +1,148 @@
+# SEO Internal Linking - Translation Template
+# Copyright (C) 2024
+# This file is distributed under the GPL v2 or later.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: SEO Internal Linking 1.0.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2024-01-01 00:00+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: admin/class-admin.php
+msgid "Maillage Interne"
+msgstr ""
+
+#: admin/class-admin.php
+msgid "Maillage SEO"
+msgstr ""
+
+#: admin/class-admin.php
+msgid "Tableau de bord"
+msgstr ""
+
+#: admin/class-admin.php
+msgid "Suggestions de liens"
+msgstr ""
+
+#: admin/class-admin.php
+msgid "Suggestions"
+msgstr ""
+
+#: admin/class-admin.php
+msgid "Articles orphelins"
+msgstr ""
+
+#: admin/class-admin.php
+msgid "Orphelins"
+msgstr ""
+
+#: admin/class-admin.php
+msgid "Statistiques"
+msgstr ""
+
+#: admin/class-admin.php
+msgid "Réglages"
+msgstr ""
+
+#: admin/class-admin.php
+msgid "Articles analysés"
+msgstr ""
+
+#: admin/class-admin.php
+msgid "Liens internes"
+msgstr ""
+
+#: admin/class-admin.php
+msgid "Suggestions en attente"
+msgstr ""
+
+#: admin/class-admin.php
+msgid "Score SEO moyen"
+msgstr ""
+
+#: admin/class-admin.php
+msgid "Mots-clés indexés"
+msgstr ""
+
+#: admin/class-admin.php
+msgid "Actions rapides"
+msgstr ""
+
+#: admin/class-admin.php
+msgid "Analyser tous les articles"
+msgstr ""
+
+#: admin/class-admin.php
+msgid "Scanner les liens existants"
+msgstr ""
+
+#: admin/class-admin.php
+msgid "Voir les suggestions"
+msgstr ""
+
+#: admin/class-admin.php
+msgid "Articles les mieux liés"
+msgstr ""
+
+#: admin/class-admin.php
+msgid "Articles orphelins récents"
+msgstr ""
+
+#: admin/class-admin.php
+msgid "Mots-clés populaires"
+msgstr ""
+
+#: admin/class-admin.php
+msgid "Article"
+msgstr ""
+
+#: admin/class-admin.php
+msgid "Liens entrants"
+msgstr ""
+
+#: admin/class-admin.php
+msgid "Action"
+msgstr ""
+
+#: admin/class-admin.php
+msgid "En attente"
+msgstr ""
+
+#: admin/class-admin.php
+msgid "Appliqué"
+msgstr ""
+
+#: admin/class-admin.php
+msgid "Ignoré"
+msgstr ""
+
+#: admin/class-admin.php
+msgid "Insérer"
+msgstr ""
+
+#: admin/class-admin.php
+msgid "Ignorer"
+msgstr ""
+
+#: admin/class-admin.php
+msgid "Permission refusée."
+msgstr ""
+
+#: admin/class-admin.php
+msgid "Analyse en cours..."
+msgstr ""
+
+#: admin/class-admin.php
+msgid "Analyse terminée !"
+msgstr ""
+
+#: admin/class-admin.php
+msgid "Une erreur est survenue."
+msgstr ""

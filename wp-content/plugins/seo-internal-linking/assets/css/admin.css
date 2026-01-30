@@ -1,0 +1,373 @@
+/**
+ * SEO Internal Linking - Admin Styles
+ */
+
+/* Dashboard Layout */
+.sil-admin {
+    max-width: 1400px;
+}
+
+.sil-dashboard {
+    margin-top: 20px;
+}
+
+/* Stats Grid */
+.sil-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+.sil-stat-card {
+    background: #fff;
+    border: 1px solid #c3c4c7;
+    border-radius: 4px;
+    padding: 20px;
+    text-align: center;
+    transition: box-shadow 0.2s ease;
+}
+
+.sil-stat-card:hover {
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.sil-stat-number {
+    font-size: 36px;
+    font-weight: 600;
+    color: #1d2327;
+    line-height: 1.2;
+}
+
+.sil-stat-label {
+    color: #646970;
+    font-size: 13px;
+    margin-top: 5px;
+}
+
+.sil-stat-warning .sil-stat-number {
+    color: #d63638;
+}
+
+/* Actions Bar */
+.sil-actions-bar {
+    background: #fff;
+    border: 1px solid #c3c4c7;
+    border-radius: 4px;
+    padding: 20px;
+    margin-bottom: 30px;
+}
+
+.sil-actions-bar h2 {
+    margin-top: 0;
+    margin-bottom: 15px;
+}
+
+.sil-actions-bar .button {
+    margin-right: 10px;
+    margin-bottom: 10px;
+}
+
+/* Progress Bar */
+#sil-progress-bar {
+    margin-top: 15px;
+}
+
+.sil-progress {
+    background: #e0e0e0;
+    border-radius: 10px;
+    height: 20px;
+    overflow: hidden;
+    margin-bottom: 5px;
+}
+
+.sil-progress-inner {
+    background: linear-gradient(90deg, #2271b1, #135e96);
+    height: 100%;
+    border-radius: 10px;
+    transition: width 0.3s ease;
+}
+
+.sil-progress-text {
+    font-size: 13px;
+    color: #646970;
+}
+
+/* Dashboard Row */
+.sil-dashboard-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+}
+
+/* Dashboard Widgets */
+.sil-dashboard-widget {
+    background: #fff;
+    border: 1px solid #c3c4c7;
+    border-radius: 4px;
+    padding: 20px;
+}
+
+.sil-dashboard-widget h3 {
+    margin-top: 0;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #f0f0f1;
+}
+
+/* Mini Table */
+.sil-mini-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.sil-mini-table th,
+.sil-mini-table td {
+    padding: 8px 10px;
+    text-align: left;
+    border-bottom: 1px solid #f0f0f1;
+}
+
+.sil-mini-table th {
+    font-weight: 600;
+    color: #1d2327;
+}
+
+.sil-mini-table tr:last-child td {
+    border-bottom: none;
+}
+
+/* Keywords Cloud */
+.sil-keywords-cloud {
+    line-height: 2;
+}
+
+.sil-keyword {
+    display: inline-block;
+    background: #f0f0f1;
+    padding: 3px 10px;
+    margin: 3px;
+    border-radius: 15px;
+    color: #1d2327;
+}
+
+.sil-keyword small {
+    color: #646970;
+    font-size: 11px;
+}
+
+/* Score Badge */
+.sil-score {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 3px;
+    font-weight: 600;
+    font-size: 12px;
+}
+
+.sil-score-high {
+    background: #d4edda;
+    color: #155724;
+}
+
+.sil-score-medium {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.sil-score-low {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+/* Status Badge */
+.sil-status {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 3px;
+    font-size: 12px;
+}
+
+.sil-status-pending {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.sil-status-applied {
+    background: #d4edda;
+    color: #155724;
+}
+
+.sil-status-rejected {
+    background: #e2e3e5;
+    color: #383d41;
+}
+
+/* Success Message */
+.sil-success {
+    color: #155724;
+    background: #d4edda;
+    padding: 10px 15px;
+    border-radius: 4px;
+}
+
+/* Statistics Page */
+.sil-stats-overview {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+.sil-stat-box {
+    background: #fff;
+    border: 1px solid #c3c4c7;
+    border-radius: 4px;
+    padding: 20px;
+}
+
+.sil-stat-box h3 {
+    margin-top: 0;
+}
+
+.sil-stat-box ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.sil-stat-box li {
+    padding: 8px 0;
+    border-bottom: 1px solid #f0f0f1;
+}
+
+.sil-stat-box li:last-child {
+    border-bottom: none;
+}
+
+/* Charts */
+.sil-charts-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+.sil-chart-container {
+    background: #fff;
+    border: 1px solid #c3c4c7;
+    border-radius: 4px;
+    padding: 20px;
+}
+
+.sil-chart-container h3 {
+    margin-top: 0;
+}
+
+.sil-chart-wide {
+    grid-column: 1 / -1;
+}
+
+/* Meta Box */
+.sil-metabox {
+    padding: 5px 0;
+}
+
+.sil-metabox-stats p {
+    margin: 8px 0;
+}
+
+.sil-metabox .button {
+    width: 100%;
+    text-align: center;
+}
+
+.sil-metabox-result {
+    padding: 10px;
+    background: #f0f0f1;
+    border-radius: 4px;
+}
+
+/* Tables */
+.wp-list-table .sil-insert-link,
+.wp-list-table .sil-dismiss-suggestion {
+    margin-right: 5px;
+}
+
+/* Responsive */
+@media screen and (max-width: 782px) {
+    .sil-stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .sil-dashboard-row {
+        grid-template-columns: 1fr;
+    }
+
+    .sil-stat-number {
+        font-size: 28px;
+    }
+}
+
+@media screen and (max-width: 480px) {
+    .sil-stats-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Animation */
+@keyframes sil-fade-in {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.sil-stat-card {
+    animation: sil-fade-in 0.3s ease;
+}
+
+.sil-stat-card:nth-child(2) { animation-delay: 0.05s; }
+.sil-stat-card:nth-child(3) { animation-delay: 0.1s; }
+.sil-stat-card:nth-child(4) { animation-delay: 0.15s; }
+.sil-stat-card:nth-child(5) { animation-delay: 0.2s; }
+.sil-stat-card:nth-child(6) { animation-delay: 0.25s; }
+
+/* Loading State */
+.sil-loading {
+    position: relative;
+    pointer-events: none;
+    opacity: 0.7;
+}
+
+.sil-loading::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 20px;
+    height: 20px;
+    margin: -10px 0 0 -10px;
+    border: 2px solid #2271b1;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: sil-spin 0.8s linear infinite;
+}
+
+@keyframes sil-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Row highlight */
+tr.sil-row-success {
+    background: #d4edda !important;
+}
+
+tr.sil-row-dismissed {
+    opacity: 0.5;
+}

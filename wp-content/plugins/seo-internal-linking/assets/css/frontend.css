@@ -1,0 +1,22 @@
+/**
+ * SEO Internal Linking - Frontend Styles
+ */
+
+/* Auto-inserted links */
+a.sil-auto-link {
+    /* Styles par défaut - peuvent être personnalisés */
+    text-decoration: underline;
+}
+
+a.sil-auto-link:hover {
+    text-decoration: none;
+}
+
+/* Manual links */
+a.sil-manual-link {
+    text-decoration: underline;
+}
+
+a.sil-manual-link:hover {
+    text-decoration: none;
+}
