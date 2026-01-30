@@ -68,6 +68,7 @@ class SEO_Internal_Linking {
         require_once SIL_PLUGIN_DIR . 'includes/class-auto-linker.php';
         require_once SIL_PLUGIN_DIR . 'includes/class-statistics.php';
         require_once SIL_PLUGIN_DIR . 'includes/class-diagnostic.php';
+        require_once SIL_PLUGIN_DIR . 'includes/class-openai-generator.php';
 
         if (is_admin()) {
             require_once SIL_PLUGIN_DIR . 'admin/class-admin.php';
@@ -129,6 +130,11 @@ class SEO_Internal_Linking {
         add_action('wp_ajax_sil_bulk_analyze', array($this, 'ajax_bulk_analyze'));
         add_action('wp_ajax_sil_run_diagnostic', array($this, 'ajax_run_diagnostic'));
         add_action('wp_ajax_sil_fix_tables', array($this, 'ajax_fix_tables'));
+
+        // AJAX handlers pour OpenAI
+        add_action('wp_ajax_sil_generate_article', array($this, 'ajax_generate_article'));
+        add_action('wp_ajax_sil_generate_image', array($this, 'ajax_generate_image'));
+        add_action('wp_ajax_sil_create_post', array($this, 'ajax_create_post'));
 
         // Cron pour l'analyse automatique
         add_action('sil_daily_analysis', array($this, 'run_daily_analysis'));
@@ -529,6 +535,127 @@ class SEO_Internal_Linking {
             'tables' => $table_results,
             'options' => $options,
             'message' => __('Réparation effectuée avec succès !', 'seo-internal-linking')
+        ));
+    }
+
+    /**
+     * AJAX: Générer un article avec OpenAI
+     */
+    public function ajax_generate_article() {
+        check_ajax_referer('sil_nonce', 'nonce');
+
+        if (!current_user_can('edit_posts')) {
+            wp_send_json_error(__('Permission refusée.', 'seo-internal-linking'));
+        }
+
+        $keyword = isset($_POST['keyword']) ? sanitize_text_field($_POST['keyword']) : '';
+        $custom_prompt = isset($_POST['custom_prompt']) ? sanitize_textarea_field($_POST['custom_prompt']) : '';
+
+        if (empty($keyword)) {
+            wp_send_json_error(__('Veuillez entrer un mot-clé.', 'seo-internal-linking'));
+        }
+
+        $generator = new SIL_OpenAI_Generator($this->options);
+
+        if (!$generator->is_configured()) {
+            wp_send_json_error(__('Clé API OpenAI non configurée. Allez dans Réglages pour la configurer.', 'seo-internal-linking'));
+        }
+
+        $result = $generator->generate_article($keyword, $custom_prompt);
+
+        if ($result['success']) {
+            $result['data']['keyword'] = $keyword;
+            wp_send_json_success($result['data']);
+        } else {
+            wp_send_json_error($result['message']);
+        }
+    }
+
+    /**
+     * AJAX: Générer une image avec DALL-E
+     */
+    public function ajax_generate_image() {
+        check_ajax_referer('sil_nonce', 'nonce');
+
+        if (!current_user_can('edit_posts')) {
+            wp_send_json_error(__('Permission refusée.', 'seo-internal-linking'));
+        }
+
+        $keyword = isset($_POST['keyword']) ? sanitize_text_field($_POST['keyword']) : '';
+        $title = isset($_POST['title']) ? sanitize_text_field($_POST['title']) : '';
+
+        if (empty($keyword)) {
+            wp_send_json_error(__('Mot-clé manquant.', 'seo-internal-linking'));
+        }
+
+        $generator = new SIL_OpenAI_Generator($this->options);
+
+        if (!$generator->is_configured()) {
+            wp_send_json_error(__('Clé API OpenAI non configurée.', 'seo-internal-linking'));
+        }
+
+        $result = $generator->generate_image($keyword, $title);
+
+        if ($result['success']) {
+            wp_send_json_success(array(
+                'image_url' => $result['image_url'],
+                'revised_prompt' => isset($result['revised_prompt']) ? $result['revised_prompt'] : ''
+            ));
+        } else {
+            wp_send_json_error($result['message']);
+        }
+    }
+
+    /**
+     * AJAX: Créer l'article WordPress
+     */
+    public function ajax_create_post() {
+        check_ajax_referer('sil_nonce', 'nonce');
+
+        if (!current_user_can('edit_posts')) {
+            wp_send_json_error(__('Permission refusée.', 'seo-internal-linking'));
+        }
+
+        $title = isset($_POST['title']) ? sanitize_text_field($_POST['title']) : '';
+        $content = isset($_POST['content']) ? wp_kses_post($_POST['content']) : '';
+        $meta_description = isset($_POST['meta_description']) ? sanitize_text_field($_POST['meta_description']) : '';
+        $keyword = isset($_POST['keyword']) ? sanitize_text_field($_POST['keyword']) : '';
+        $image_url = isset($_POST['image_url']) ? esc_url_raw($_POST['image_url']) : '';
+        $status = isset($_POST['status']) ? sanitize_key($_POST['status']) : 'draft';
+
+        if (empty($title) || empty($content)) {
+            wp_send_json_error(__('Titre et contenu requis.', 'seo-internal-linking'));
+        }
+
+        $generator = new SIL_OpenAI_Generator($this->options);
+
+        // Créer l'article
+        $post_result = $generator->create_post(array(
+            'title' => $title,
+            'content' => $content,
+            'meta_description' => $meta_description,
+            'keyword' => $keyword
+        ), $status);
+
+        if (!$post_result['success']) {
+            wp_send_json_error($post_result['message']);
+        }
+
+        $post_id = $post_result['post_id'];
+
+        // Télécharger et attacher l'image si présente
+        $image_attached = false;
+        if (!empty($image_url)) {
+            $image_result = $generator->download_and_attach_image($image_url, $post_id, $title);
+            $image_attached = $image_result['success'];
+        }
+
+        wp_send_json_success(array(
+            'post_id' => $post_id,
+            'edit_url' => $post_result['edit_url'],
+            'preview_url' => $post_result['preview_url'],
+            'image_attached' => $image_attached,
+            'message' => __('Article créé avec succès !', 'seo-internal-linking')
         ));
     }
 }

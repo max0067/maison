@@ -109,6 +109,16 @@ class SIL_Admin {
             array($this, 'render_statistics_page')
         );
 
+        // Sous-menu Générateur d'articles
+        add_submenu_page(
+            'seo-internal-linking',
+            __('Générateur IA', 'seo-internal-linking'),
+            __('Générateur IA', 'seo-internal-linking'),
+            'edit_posts',
+            'sil-generator',
+            array($this, 'render_generator_page')
+        );
+
         // Sous-menu Réglages
         add_submenu_page(
             'seo-internal-linking',
@@ -214,6 +224,70 @@ class SIL_Admin {
             array(
                 'id' => 'open_in_new_tab',
                 'description' => __('Ouvrir les liens dans un nouvel onglet', 'seo-internal-linking')
+            )
+        );
+
+        // Section OpenAI
+        add_settings_section(
+            'sil_openai_section',
+            __('Paramètres OpenAI (Générateur IA)', 'seo-internal-linking'),
+            array($this, 'render_openai_section'),
+            'sil-settings'
+        );
+
+        add_settings_field(
+            'openai_api_key',
+            __('Clé API OpenAI', 'seo-internal-linking'),
+            array($this, 'render_password_field'),
+            'sil-settings',
+            'sil_openai_section',
+            array(
+                'id' => 'openai_api_key',
+                'description' => __('Votre clé API OpenAI (commence par sk-...)', 'seo-internal-linking')
+            )
+        );
+
+        add_settings_field(
+            'openai_model',
+            __('Modèle GPT', 'seo-internal-linking'),
+            array($this, 'render_select_field'),
+            'sil-settings',
+            'sil_openai_section',
+            array(
+                'id' => 'openai_model',
+                'options' => array(
+                    'gpt-4o-mini' => 'GPT-4o Mini (rapide, économique)',
+                    'gpt-4o' => 'GPT-4o (meilleure qualité)',
+                    'gpt-4-turbo' => 'GPT-4 Turbo',
+                    'gpt-3.5-turbo' => 'GPT-3.5 Turbo (le plus économique)'
+                ),
+                'description' => __('Modèle à utiliser pour la génération de contenu', 'seo-internal-linking')
+            )
+        );
+
+        add_settings_field(
+            'openai_custom_prompt',
+            __('Prompt personnalisé', 'seo-internal-linking'),
+            array($this, 'render_textarea_field'),
+            'sil-settings',
+            'sil_openai_section',
+            array(
+                'id' => 'openai_custom_prompt',
+                'rows' => 10,
+                'description' => __('Prompt personnalisé pour la génération d\'articles. Utilisez {keyword} pour insérer le mot-clé. Laissez vide pour utiliser le prompt par défaut.', 'seo-internal-linking')
+            )
+        );
+
+        add_settings_field(
+            'openai_image_prompt',
+            __('Prompt pour les images', 'seo-internal-linking'),
+            array($this, 'render_textarea_field'),
+            'sil-settings',
+            'sil_openai_section',
+            array(
+                'id' => 'openai_image_prompt',
+                'rows' => 3,
+                'description' => __('Prompt pour DALL-E. Utilisez {keyword} et {title}. Laissez vide pour le prompt par défaut.', 'seo-internal-linking')
             )
         );
     }
@@ -944,13 +1018,58 @@ class SIL_Admin {
      */
     public function render_textarea_field($args) {
         $value = isset($this->options[$args['id']]) ? $this->options[$args['id']] : '';
+        $rows = isset($args['rows']) ? $args['rows'] : 3;
         ?>
         <textarea name="sil_options[<?php echo $args['id']; ?>]"
-                  rows="3"
+                  rows="<?php echo $rows; ?>"
                   cols="50"
                   class="large-text"><?php echo esc_textarea($value); ?></textarea>
         <p class="description"><?php echo $args['description']; ?></p>
         <?php
+    }
+
+    /**
+     * Render champ password
+     */
+    public function render_password_field($args) {
+        $value = isset($this->options[$args['id']]) ? $this->options[$args['id']] : '';
+        $masked = !empty($value) ? str_repeat('*', 20) . substr($value, -4) : '';
+        ?>
+        <input type="password"
+               name="sil_options[<?php echo $args['id']; ?>]"
+               value="<?php echo esc_attr($value); ?>"
+               class="regular-text"
+               autocomplete="new-password">
+        <?php if (!empty($value)) : ?>
+            <span class="description" style="color: green;">&#10004; <?php _e('Configurée', 'seo-internal-linking'); ?></span>
+        <?php endif; ?>
+        <p class="description"><?php echo $args['description']; ?></p>
+        <?php
+    }
+
+    /**
+     * Render champ select
+     */
+    public function render_select_field($args) {
+        $value = isset($this->options[$args['id']]) ? $this->options[$args['id']] : '';
+        ?>
+        <select name="sil_options[<?php echo $args['id']; ?>]">
+            <?php foreach ($args['options'] as $key => $label) : ?>
+                <option value="<?php echo esc_attr($key); ?>" <?php selected($value, $key); ?>>
+                    <?php echo esc_html($label); ?>
+                </option>
+            <?php endforeach; ?>
+        </select>
+        <p class="description"><?php echo $args['description']; ?></p>
+        <?php
+    }
+
+    /**
+     * Render de la section OpenAI
+     */
+    public function render_openai_section() {
+        echo '<p>' . __('Configurez OpenAI pour générer automatiquement des articles avec DALL-E pour les images.', 'seo-internal-linking') . '</p>';
+        echo '<p><a href="https://platform.openai.com/api-keys" target="_blank">' . __('Obtenir une clé API OpenAI', 'seo-internal-linking') . ' &rarr;</a></p>';
     }
 
     /**
@@ -986,6 +1105,12 @@ class SIL_Admin {
         $sanitized['excluded_words'] = sanitize_textarea_field($input['excluded_words']);
         $sanitized['open_in_new_tab'] = !empty($input['open_in_new_tab']);
         $sanitized['post_types'] = isset($input['post_types']) ? array_map('sanitize_key', $input['post_types']) : array('post', 'page');
+
+        // OpenAI settings
+        $sanitized['openai_api_key'] = isset($input['openai_api_key']) ? sanitize_text_field($input['openai_api_key']) : '';
+        $sanitized['openai_model'] = isset($input['openai_model']) ? sanitize_key($input['openai_model']) : 'gpt-4o-mini';
+        $sanitized['openai_custom_prompt'] = isset($input['openai_custom_prompt']) ? sanitize_textarea_field($input['openai_custom_prompt']) : '';
+        $sanitized['openai_image_prompt'] = isset($input['openai_image_prompt']) ? sanitize_textarea_field($input['openai_image_prompt']) : '';
 
         return $sanitized;
     }
@@ -1362,6 +1487,260 @@ class SIL_Admin {
             }
             .sil-diagnostic-section h3 {
                 margin-top: 20px;
+            }
+            </style>
+        </div>
+        <?php
+    }
+
+    /**
+     * Afficher la page du générateur d'articles
+     */
+    public function render_generator_page() {
+        $generator = new SIL_OpenAI_Generator($this->options);
+        $is_configured = $generator->is_configured();
+        ?>
+        <div class="wrap sil-admin">
+            <h1><?php _e('Générateur d\'articles IA', 'seo-internal-linking'); ?></h1>
+
+            <?php if (!$is_configured) : ?>
+                <div class="notice notice-warning">
+                    <p>
+                        <strong><?php _e('Configuration requise !', 'seo-internal-linking'); ?></strong>
+                        <?php _e('Vous devez configurer votre clé API OpenAI dans les', 'seo-internal-linking'); ?>
+                        <a href="<?php echo admin_url('admin.php?page=sil-settings'); ?>"><?php _e('Réglages', 'seo-internal-linking'); ?></a>.
+                    </p>
+                </div>
+            <?php endif; ?>
+
+            <div class="sil-generator-container">
+                <!-- Étape 1: Mot-clé -->
+                <div class="sil-generator-step" id="sil-step-keyword">
+                    <h2><span class="step-number">1</span> <?php _e('Entrez votre mot-clé', 'seo-internal-linking'); ?></h2>
+                    <div class="sil-form-group">
+                        <label for="sil-keyword"><?php _e('Mot-clé principal', 'seo-internal-linking'); ?></label>
+                        <input type="text" id="sil-keyword" class="regular-text" placeholder="<?php _e('Ex: recette gâteau chocolat', 'seo-internal-linking'); ?>" <?php echo !$is_configured ? 'disabled' : ''; ?>>
+                        <p class="description"><?php _e('Le sujet principal de votre article', 'seo-internal-linking'); ?></p>
+                    </div>
+                    <button type="button" class="button button-primary button-hero" id="sil-generate-article" <?php echo !$is_configured ? 'disabled' : ''; ?>>
+                        <span class="dashicons dashicons-edit" style="margin-top: 4px;"></span>
+                        <?php _e('Générer l\'article', 'seo-internal-linking'); ?>
+                    </button>
+                    <span id="sil-generate-status"></span>
+                </div>
+
+                <!-- Étape 2: Prévisualisation -->
+                <div class="sil-generator-step" id="sil-step-preview" style="display: none;">
+                    <h2><span class="step-number">2</span> <?php _e('Prévisualisation et modifications', 'seo-internal-linking'); ?></h2>
+
+                    <div class="sil-preview-section">
+                        <div class="sil-form-group">
+                            <label for="sil-preview-title"><?php _e('Titre (H1)', 'seo-internal-linking'); ?></label>
+                            <input type="text" id="sil-preview-title" class="large-text">
+                            <span class="sil-char-count" id="sil-title-count">0/70</span>
+                        </div>
+
+                        <div class="sil-form-group">
+                            <label for="sil-preview-meta"><?php _e('Meta Description', 'seo-internal-linking'); ?></label>
+                            <textarea id="sil-preview-meta" rows="2" class="large-text"></textarea>
+                            <span class="sil-char-count" id="sil-meta-count">0/154</span>
+                        </div>
+
+                        <div class="sil-form-group">
+                            <label for="sil-preview-content"><?php _e('Contenu', 'seo-internal-linking'); ?></label>
+                            <div id="sil-preview-content-wrapper">
+                                <textarea id="sil-preview-content" rows="15" class="large-text"></textarea>
+                            </div>
+                            <p class="description" id="sil-word-count"><?php _e('Nombre de mots:', 'seo-internal-linking'); ?> <span>0</span></p>
+                        </div>
+                    </div>
+
+                    <div class="sil-preview-actions">
+                        <button type="button" class="button" id="sil-regenerate">
+                            <span class="dashicons dashicons-update" style="margin-top: 4px;"></span>
+                            <?php _e('Régénérer', 'seo-internal-linking'); ?>
+                        </button>
+                        <button type="button" class="button button-primary" id="sil-generate-image">
+                            <span class="dashicons dashicons-format-image" style="margin-top: 4px;"></span>
+                            <?php _e('Générer l\'image', 'seo-internal-linking'); ?>
+                        </button>
+                        <span id="sil-image-status"></span>
+                    </div>
+                </div>
+
+                <!-- Étape 3: Image -->
+                <div class="sil-generator-step" id="sil-step-image" style="display: none;">
+                    <h2><span class="step-number">3</span> <?php _e('Image à la une', 'seo-internal-linking'); ?></h2>
+
+                    <div class="sil-image-preview" id="sil-image-preview">
+                        <p class="description"><?php _e('L\'image générée apparaîtra ici', 'seo-internal-linking'); ?></p>
+                    </div>
+
+                    <div class="sil-image-actions">
+                        <button type="button" class="button" id="sil-regenerate-image">
+                            <span class="dashicons dashicons-update" style="margin-top: 4px;"></span>
+                            <?php _e('Nouvelle image', 'seo-internal-linking'); ?>
+                        </button>
+                        <button type="button" class="button" id="sil-skip-image">
+                            <?php _e('Passer (sans image)', 'seo-internal-linking'); ?>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Étape 4: Publication -->
+                <div class="sil-generator-step" id="sil-step-publish" style="display: none;">
+                    <h2><span class="step-number">4</span> <?php _e('Créer l\'article', 'seo-internal-linking'); ?></h2>
+
+                    <div class="sil-publish-options">
+                        <label>
+                            <input type="radio" name="sil-publish-status" value="draft" checked>
+                            <?php _e('Brouillon (recommandé)', 'seo-internal-linking'); ?>
+                        </label>
+                        <label>
+                            <input type="radio" name="sil-publish-status" value="publish">
+                            <?php _e('Publier immédiatement', 'seo-internal-linking'); ?>
+                        </label>
+                    </div>
+
+                    <button type="button" class="button button-primary button-hero" id="sil-create-post">
+                        <span class="dashicons dashicons-yes" style="margin-top: 4px;"></span>
+                        <?php _e('Créer l\'article', 'seo-internal-linking'); ?>
+                    </button>
+                    <span id="sil-publish-status"></span>
+                </div>
+
+                <!-- Résultat final -->
+                <div class="sil-generator-step sil-success-step" id="sil-step-success" style="display: none;">
+                    <div class="sil-success-message">
+                        <span class="dashicons dashicons-yes-alt"></span>
+                        <h2><?php _e('Article créé avec succès !', 'seo-internal-linking'); ?></h2>
+                    </div>
+                    <div class="sil-success-actions">
+                        <a href="#" class="button button-primary" id="sil-edit-post-link" target="_blank">
+                            <?php _e('Modifier l\'article', 'seo-internal-linking'); ?>
+                        </a>
+                        <a href="#" class="button" id="sil-preview-post-link" target="_blank">
+                            <?php _e('Prévisualiser', 'seo-internal-linking'); ?>
+                        </a>
+                        <button type="button" class="button" id="sil-new-article">
+                            <?php _e('Créer un autre article', 'seo-internal-linking'); ?>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <style>
+            .sil-generator-container {
+                max-width: 900px;
+            }
+            .sil-generator-step {
+                background: #fff;
+                border: 1px solid #c3c4c7;
+                border-radius: 4px;
+                padding: 25px;
+                margin-bottom: 20px;
+            }
+            .sil-generator-step h2 {
+                margin-top: 0;
+                display: flex;
+                align-items: center;
+                gap: 10px;
+            }
+            .step-number {
+                background: #2271b1;
+                color: #fff;
+                width: 30px;
+                height: 30px;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 14px;
+            }
+            .sil-form-group {
+                margin-bottom: 20px;
+            }
+            .sil-form-group label {
+                display: block;
+                font-weight: 600;
+                margin-bottom: 5px;
+            }
+            .sil-form-group input[type="text"],
+            .sil-form-group textarea {
+                width: 100%;
+            }
+            .sil-char-count {
+                display: block;
+                text-align: right;
+                font-size: 12px;
+                color: #666;
+            }
+            .sil-char-count.warning {
+                color: #dba617;
+            }
+            .sil-char-count.error {
+                color: #d63638;
+            }
+            .sil-preview-actions,
+            .sil-image-actions {
+                display: flex;
+                gap: 10px;
+                margin-top: 20px;
+            }
+            .sil-image-preview {
+                background: #f5f5f5;
+                border: 2px dashed #c3c4c7;
+                border-radius: 4px;
+                padding: 20px;
+                text-align: center;
+                min-height: 200px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+            .sil-image-preview img {
+                max-width: 100%;
+                height: auto;
+                border-radius: 4px;
+            }
+            .sil-publish-options {
+                display: flex;
+                gap: 20px;
+                margin-bottom: 20px;
+            }
+            .sil-publish-options label {
+                display: flex;
+                align-items: center;
+                gap: 5px;
+                cursor: pointer;
+            }
+            .sil-success-step {
+                text-align: center;
+                background: #d4edda;
+                border-color: #28a745;
+            }
+            .sil-success-message {
+                margin-bottom: 20px;
+            }
+            .sil-success-message .dashicons {
+                font-size: 60px;
+                width: 60px;
+                height: 60px;
+                color: #28a745;
+            }
+            .sil-success-actions {
+                display: flex;
+                gap: 10px;
+                justify-content: center;
+            }
+            #sil-generate-status,
+            #sil-image-status,
+            #sil-publish-status {
+                margin-left: 10px;
+            }
+            .spinner.is-active {
+                float: none;
+                margin: 0;
             }
             </style>
         </div>

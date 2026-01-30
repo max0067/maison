@@ -677,4 +677,306 @@
         SIL.init();
     });
 
+    /**
+     * Générateur d'articles IA
+     */
+    var SIL_Generator = {
+        keyword: '',
+        title: '',
+        content: '',
+        metaDescription: '',
+        imageUrl: '',
+
+        init: function() {
+            this.bindEvents();
+            this.setupCharCounters();
+        },
+
+        bindEvents: function() {
+            var self = this;
+
+            // Générer l'article
+            $(document).on('click', '#sil-generate-article', function() {
+                self.generateArticle();
+            });
+
+            // Régénérer
+            $(document).on('click', '#sil-regenerate', function() {
+                self.generateArticle();
+            });
+
+            // Générer l'image
+            $(document).on('click', '#sil-generate-image', function() {
+                self.generateImage();
+            });
+
+            // Régénérer l'image
+            $(document).on('click', '#sil-regenerate-image', function() {
+                self.generateImage();
+            });
+
+            // Passer l'image
+            $(document).on('click', '#sil-skip-image', function() {
+                self.imageUrl = '';
+                self.showPublishStep();
+            });
+
+            // Créer l'article
+            $(document).on('click', '#sil-create-post', function() {
+                self.createPost();
+            });
+
+            // Nouveau article
+            $(document).on('click', '#sil-new-article', function() {
+                self.reset();
+            });
+
+            // Enter sur le champ mot-clé
+            $(document).on('keypress', '#sil-keyword', function(e) {
+                if (e.which === 13) {
+                    e.preventDefault();
+                    self.generateArticle();
+                }
+            });
+        },
+
+        setupCharCounters: function() {
+            // Compteur titre
+            $(document).on('input', '#sil-preview-title', function() {
+                var len = $(this).val().length;
+                var $counter = $('#sil-title-count');
+                $counter.text(len + '/70');
+                $counter.removeClass('warning error');
+                if (len > 70) $counter.addClass('error');
+                else if (len > 60) $counter.addClass('warning');
+            });
+
+            // Compteur meta
+            $(document).on('input', '#sil-preview-meta', function() {
+                var len = $(this).val().length;
+                var $counter = $('#sil-meta-count');
+                $counter.text(len + '/154');
+                $counter.removeClass('warning error');
+                if (len > 154) $counter.addClass('error');
+                else if (len > 145) $counter.addClass('warning');
+            });
+
+            // Compteur mots
+            $(document).on('input', '#sil-preview-content', function() {
+                var text = $(this).val().replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+                var words = text ? text.split(' ').length : 0;
+                $('#sil-word-count span').text(words);
+            });
+        },
+
+        generateArticle: function() {
+            var self = this;
+            var keyword = $('#sil-keyword').val().trim();
+
+            if (!keyword) {
+                alert('Veuillez entrer un mot-clé.');
+                return;
+            }
+
+            this.keyword = keyword;
+
+            var $btn = $('#sil-generate-article, #sil-regenerate');
+            var $status = $('#sil-generate-status');
+
+            $btn.prop('disabled', true);
+            $status.html('<span class="spinner is-active"></span> Génération en cours... (peut prendre 30-60 secondes)');
+
+            $.ajax({
+                url: silAdmin.ajaxUrl,
+                type: 'POST',
+                data: {
+                    action: 'sil_generate_article',
+                    nonce: silAdmin.nonce,
+                    keyword: keyword
+                },
+                timeout: 180000, // 3 minutes
+                success: function(response) {
+                    $btn.prop('disabled', false);
+
+                    if (response.success) {
+                        self.title = response.data.title || '';
+                        self.content = response.data.content || '';
+                        self.metaDescription = response.data.meta_description || '';
+
+                        // Remplir les champs
+                        $('#sil-preview-title').val(self.title).trigger('input');
+                        $('#sil-preview-meta').val(self.metaDescription).trigger('input');
+                        $('#sil-preview-content').val(self.content).trigger('input');
+
+                        // Afficher l'étape preview
+                        $('#sil-step-preview').show();
+                        $status.html('<span style="color: green;">&#10004; Article généré !</span>');
+
+                        // Scroll vers preview
+                        $('html, body').animate({
+                            scrollTop: $('#sil-step-preview').offset().top - 50
+                        }, 500);
+                    } else {
+                        $status.html('<span style="color: red;">Erreur: ' + response.data + '</span>');
+                    }
+                },
+                error: function(xhr, status, error) {
+                    $btn.prop('disabled', false);
+                    var message = 'Erreur de connexion.';
+                    if (status === 'timeout') {
+                        message = 'Délai d\'attente dépassé. Réessayez.';
+                    }
+                    $status.html('<span style="color: red;">' + message + '</span>');
+                }
+            });
+        },
+
+        generateImage: function() {
+            var self = this;
+
+            var $btn = $('#sil-generate-image, #sil-regenerate-image');
+            var $status = $('#sil-image-status');
+
+            $btn.prop('disabled', true);
+            $status.html('<span class="spinner is-active"></span> Génération de l\'image... (30-60 secondes)');
+
+            $.ajax({
+                url: silAdmin.ajaxUrl,
+                type: 'POST',
+                data: {
+                    action: 'sil_generate_image',
+                    nonce: silAdmin.nonce,
+                    keyword: this.keyword,
+                    title: $('#sil-preview-title').val()
+                },
+                timeout: 120000,
+                success: function(response) {
+                    $btn.prop('disabled', false);
+
+                    if (response.success) {
+                        self.imageUrl = response.data.image_url;
+
+                        // Afficher l'image
+                        $('#sil-image-preview').html('<img src="' + self.imageUrl + '" alt="Image générée">');
+
+                        // Afficher les étapes suivantes
+                        $('#sil-step-image').show();
+                        self.showPublishStep();
+
+                        $status.html('<span style="color: green;">&#10004; Image générée !</span>');
+
+                        // Scroll
+                        $('html, body').animate({
+                            scrollTop: $('#sil-step-image').offset().top - 50
+                        }, 500);
+                    } else {
+                        $status.html('<span style="color: red;">Erreur: ' + response.data + '</span>');
+                    }
+                },
+                error: function() {
+                    $btn.prop('disabled', false);
+                    $status.html('<span style="color: red;">Erreur de connexion.</span>');
+                }
+            });
+        },
+
+        showPublishStep: function() {
+            $('#sil-step-publish').show();
+            $('html, body').animate({
+                scrollTop: $('#sil-step-publish').offset().top - 50
+            }, 500);
+        },
+
+        createPost: function() {
+            var self = this;
+
+            var $btn = $('#sil-create-post');
+            var $status = $('#sil-publish-status');
+
+            // Récupérer les valeurs modifiées
+            var title = $('#sil-preview-title').val();
+            var content = $('#sil-preview-content').val();
+            var metaDescription = $('#sil-preview-meta').val();
+            var status = $('input[name="sil-publish-status"]:checked').val();
+
+            if (!title || !content) {
+                alert('Titre et contenu requis.');
+                return;
+            }
+
+            $btn.prop('disabled', true);
+            $status.html('<span class="spinner is-active"></span> Création de l\'article...');
+
+            $.ajax({
+                url: silAdmin.ajaxUrl,
+                type: 'POST',
+                data: {
+                    action: 'sil_create_post',
+                    nonce: silAdmin.nonce,
+                    title: title,
+                    content: content,
+                    meta_description: metaDescription,
+                    keyword: this.keyword,
+                    image_url: this.imageUrl,
+                    status: status
+                },
+                timeout: 60000,
+                success: function(response) {
+                    $btn.prop('disabled', false);
+
+                    if (response.success) {
+                        // Mettre à jour les liens
+                        $('#sil-edit-post-link').attr('href', response.data.edit_url);
+                        $('#sil-preview-post-link').attr('href', response.data.preview_url);
+
+                        // Afficher le succès
+                        $('#sil-step-publish').hide();
+                        $('#sil-step-success').show();
+
+                        $status.html('');
+
+                        // Scroll
+                        $('html, body').animate({
+                            scrollTop: $('#sil-step-success').offset().top - 50
+                        }, 500);
+                    } else {
+                        $status.html('<span style="color: red;">Erreur: ' + response.data + '</span>');
+                    }
+                },
+                error: function() {
+                    $btn.prop('disabled', false);
+                    $status.html('<span style="color: red;">Erreur de connexion.</span>');
+                }
+            });
+        },
+
+        reset: function() {
+            this.keyword = '';
+            this.title = '';
+            this.content = '';
+            this.metaDescription = '';
+            this.imageUrl = '';
+
+            $('#sil-keyword').val('');
+            $('#sil-preview-title').val('');
+            $('#sil-preview-meta').val('');
+            $('#sil-preview-content').val('');
+            $('#sil-image-preview').html('<p class="description">L\'image générée apparaîtra ici</p>');
+
+            $('#sil-step-preview, #sil-step-image, #sil-step-publish, #sil-step-success').hide();
+            $('#sil-generate-status, #sil-image-status, #sil-publish-status').html('');
+
+            $('html, body').animate({
+                scrollTop: $('#sil-step-keyword').offset().top - 50
+            }, 500);
+        }
+    };
+
+    // Initialize Generator when DOM is ready
+    $(document).ready(function() {
+        if ($('#sil-keyword').length) {
+            SIL_Generator.init();
+        }
+    });
+
 })(jQuery);
